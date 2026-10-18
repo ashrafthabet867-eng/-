@@ -1,0 +1,67 @@
+<svg viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- White circular background -->
+  <circle cx="100" cy="100" r="99" fill="#FFFFFF" />
+  
+  <!-- Outer and Inner Navy Rings -->
+  <circle cx="100" cy="100" r="96" stroke="#102a5c" stroke-width="3" />
+  <circle cx="100" cy="100" r="76" stroke="#102a5c" stroke-width="1.8" />
+  
+  <defs>
+    <!-- Top Arc for Arabic Text -->
+    <path id="topArcAr" d="M 18,100 A 82,82 0 0,1 182,100" fill="none" />
+    <!-- Bottom Arc for English Text -->
+    <path id="bottomArcEn" d="M 22,105 A 80,80 0 0,0 178,105" fill="none" />
+  </defs>
+
+  <!-- Arabic Curved Text: الهيئة القومية للتأمين الاجتماعي -->
+  <text fill="#102a5c" font-size="14" font-weight="800" font-family="'Cairo', Tahoma, sans-serif" letter-spacing="0.1">
+    <textPath href="#topArcAr" startOffset="50%" text-anchor="middle">
+      الهيئة القومية للتأمين الاجتماعي
+    </textPath>
+  </text>
+
+  <!-- English Curved Text: National Organization for Social Insurance -->
+  <text fill="#102a5c" font-size="8.8" font-weight="700" font-family="Arial, Helvetica, sans-serif" letter-spacing="0.4">
+    <textPath href="#bottomArcEn" startOffset="50%" text-anchor="middle">
+      National Organization for Social Insurance
+    </textPath>
+  </text>
+
+  <!-- Divider Stars/Dots between Arabic & English -->
+  <circle cx="20" cy="102" r="2.2" fill="#102a5c" />
+  <circle cx="180" cy="102" r="2.2" fill="#102a5c" />
+
+  <!-- Center Artwork: Family Silhouette & Protective Hands -->
+  <g transform="translate(100, 100) scale(1.15)">
+    <!-- Family Silhouette in Navy -->
+    <g fill="#102a5c">
+      <!-- Father -->
+      <circle cx="-16" cy="-26" r="6.5" />
+      <path d="M -23,-17 C -27,-10 -24,2 -16,2 C -9,2 -8,-10 -13,-17 Z" />
+
+      <!-- Mother -->
+      <circle cx="1" cy="-29" r="6" />
+      <path d="M -5,-19 C -10,-13 -7,-1 1,-1 C 8,-1 9,-13 4,-19 Z" />
+
+      <!-- Child 1 (Older boy) -->
+      <circle cx="18" cy="-12" r="5" />
+      <path d="M 14,-5 C 10,1 12,11 18,11 C 24,11 25,1 20,-5 Z" />
+
+      <!-- Child 2 (Toddler) -->
+      <circle cx="8" cy="-9" r="4.2" />
+      <path d="M 5,-3 C 3,1 4,8 8,8 C 12,8 13,1 10,-3 Z" />
+    </g>
+
+    <!-- Protective Hands in Sky Blue / Cyan Layers -->
+    <g>
+      <!-- Base Layer (Deep Blue-Cyan) -->
+      <path d="M -50,-14 C -45,3 -28,24 -7,32 C 14,39 42,32 58,10 C 44,21 21,26 0,21 C -20,16 -37,-2 -41,-14 Z" fill="#0284c7" />
+      <!-- Mid Palm Layer (Bright Cyan) -->
+      <path d="M -48,-6 C -43,9 -26,26 -5,32 C 11,36 34,29 48,13 C 32,22 14,25 -2,19 C -19,14 -33,0 -38,-10 Z" fill="#38bdf8" />
+      <!-- Upper Fingers/Palm Swoop (Soft Sky Cyan) -->
+      <path d="M -33,-24 C -39,-10 -31,9 -18,17 C -4,26 18,25 35,18 C 23,22 4,21 -7,14 C -19,7 -27,-6 -25,-19 Z" fill="#7dd3fc" />
+      <!-- Inner White Contour Highlight -->
+      <path d="M -22,10 C -10,17 11,17 26,11 C 13,14 -4,14 -16,8 Z" fill="#FFFFFF" opacity="0.9" />
+    </g>
+  </g>
+</svg>

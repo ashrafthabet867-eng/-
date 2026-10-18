@@ -1,0 +1,25 @@
+{
+  "name": "مستشار التأمينات والمعاشات المصري",
+  "short_name": "مستشار التأمينات",
+  "description": "المستشار الذكي للمواطنين وفقاً لقانون التأمينات الاجتماعية والمعاشات رقم 148 لسنة 2019",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#0b1e36",
+  "dir": "rtl",
+  "lang": "ar",
+  "icons": [
+    {
+      "src": "/logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
