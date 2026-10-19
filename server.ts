@@ -604,21 +604,29 @@ app.post('/api/calculate-pension', (req, res) => {
 });
 
 // Setup Vite in Dev or Static files in Production
-const isProd = process.env.NODE_ENV === 'production';
-if (isProd) {
-  app.use(express.static('dist'));
-  app.get('*', (req, res) => {
-    res.sendFile(path.resolve('dist', 'index.html'));
-  });
-} else {
-  const vite = await createViteServer({
-    server: { middlewareMode: true },
-    appType: 'spa',
-  });
-  app.use(vite.middlewares);
+const isVercel = Boolean(process.env.VERCEL);
+const isProd = process.env.NODE_ENV === 'production' || isVercel;
+
+if (!isVercel) {
+  if (isProd) {
+    app.use(express.static('dist'));
+    app.get('*', (req, res) => {
+      res.sendFile(path.resolve('dist', 'index.html'));
+    });
+  } else {
+    const vite = await createViteServer({
+      server: { middlewareMode: true },
+      appType: 'spa',
+    });
+    app.use(vite.middlewares);
+  }
 }
 
 const PORT = Number(process.env.PORT) || 3000;
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server listening on http://0.0.0.0:${PORT}`);
-});
+if (!isVercel) {
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Server listening on http://0.0.0.0:${PORT}`);
+  });
+}
+
+export default app;

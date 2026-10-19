@@ -176,14 +176,21 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
 
           {/* Content */}
           <div className="space-y-1">
-            {message.hasError || (message.content && (message.content.includes('503') || message.content.includes('UNAVAILABLE') || message.content.includes('high demand'))) ? (
+            {message.hasError ? (
               <div className="bg-amber-50/90 border border-amber-300 rounded-xl p-3.5 text-amber-950 text-xs sm:text-sm space-y-2">
                 <div className="flex items-center gap-2 font-bold text-amber-900">
                   <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0" />
-                  <span>ضغط مؤقت على خوادم الذكاء الاصطناعي (503 Service Unavailable)</span>
+                  <span>
+                    {message.content && message.content.includes('404')
+                      ? 'تنبيه: ملفات الخادم بحاجة للمزامنة مع GitHub'
+                      : message.content && message.content.includes('مفتاح')
+                      ? 'تنبيه: إعداد مفتاح الذكاء الاصطناعي'
+                      : 'ضغط مؤقت على خوادم الذكاء الاصطناعي (503 Service Unavailable)'}
+                  </span>
                 </div>
                 <p className="text-amber-800 leading-relaxed text-xs">
-                  هذا أمر تقني طبيعي ومؤقت يحدث أثناء فترات الذروة اللحظية في حركة المرور. يمكنك الضغط على زر <strong>إعادة المحاولة</strong> أدناه وسيقوم النظام بتوجيه استفسارك مباشرة للنموذج البديل السريع للإجابة فوراً.
+                  {message.content ||
+                    'هذا أمر تقني طبيعي ومؤقت يحدث أثناء فترات الذروة اللحظية في حركة المرور. يمكنك الضغط على زر إعادة المحاولة أدناه وسيقوم النظام بتوجيه استفسارك مباشرة للنموذج البديل السريع للإجابة فوراً.'}
                 </p>
                 {onRetry && (
                   <div className="pt-1">

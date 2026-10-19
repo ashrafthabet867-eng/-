@@ -223,7 +223,17 @@ export default function App() {
       });
 
       if (!response.ok || !response.body) {
-        throw new Error('فشل الاتصال بالخادم');
+        if (response.status === 404) {
+          throw new Error('مسار الخادم غير متصل (404 Not Found) - يرجى الضغط على زر Export أو Push to GitHub في الشريط العلوي لتحديث ملفات Vercel تلقائياً.');
+        }
+        let serverErrMsg = '';
+        try {
+          const errData = await response.json();
+          serverErrMsg = errData.error || '';
+        } catch {
+          // ignore
+        }
+        throw new Error(serverErrMsg || `فشل الاتصال بالخادم (${response.status})`);
       }
 
       const reader = response.body.getReader();
@@ -303,6 +313,7 @@ export default function App() {
             ? {
                 ...m,
                 content:
+                  err?.message ||
                   'عذراً يا فندم، حدث ضغط لحظي مؤقت في الاتصال بالخدمة. يرجى الضغط على زر إعادة المحاولة أو المحاولة مرة أخرى.',
                 isStreaming: false,
                 hasError: true,
