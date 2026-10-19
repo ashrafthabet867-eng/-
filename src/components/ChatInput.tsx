@@ -40,6 +40,8 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   const audioContextRef = useRef<AudioContext | null>(null);
   const animFrameRef = useRef<number | null>(null);
   const liveTranscriptRef = useRef<string>('');
+  const isRecordingRef = useRef<boolean>(false);
+  const baseTextRef = useRef<string>('');
 
   // Keep liveTranscriptRef in sync
   useEffect(() => {
@@ -54,6 +56,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   }, []);
 
   const cleanupAudioResources = () => {
+    isRecordingRef.current = false;
     if (timerIntervalRef.current) {
       clearInterval(timerIntervalRef.current);
       timerIntervalRef.current = null;
@@ -74,6 +77,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
       try {
         recognitionRef.current.onend = null;
         recognitionRef.current.onerror = null;
+        recognitionRef.current.onresult = null;
         recognitionRef.current.stop();
       } catch (e) {
         // ignore
@@ -100,17 +104,113 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     setAudioVolume(0);
   };
 
-  // Start voice recording session with visualizer, MediaRecorder and Web Speech fallback
+  // Start voice recording session
   const startRecording = async () => {
     setMicError(null);
     setLiveTranscript('');
     liveTranscriptRef.current = '';
     audioChunksRef.current = [];
     setRecordingSeconds(0);
+    baseTextRef.current = text.trim();
+    isRecordingRef.current = true;
+    setIsRecording(true);
 
-    // 1. Check support and request microphone access
+    // 1. Primary: Direct Native Web Speech API (Chrome, Edge, Safari, Android)
+    const SpeechRec = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+
+    if (SpeechRec) {
+      try {
+        const recognition = new SpeechRec();
+        recognition.lang = 'ar-EG';
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        recognition.maxAlternatives = 1;
+
+        // Visual equalizer animation & seconds counter
+        timerIntervalRef.current = setInterval(() => {
+          setRecordingSeconds((prev) => prev + 1);
+        }, 1000);
+
+        const simulateWave = () => {
+          if (!isRecordingRef.current) return;
+          const randomVol = Math.floor(25 + Math.random() * 55);
+          setAudioVolume(randomVol);
+          animFrameRef.current = requestAnimationFrame(() => {
+            setTimeout(simulateWave, 100);
+          });
+        };
+        simulateWave();
+
+        recognition.onresult = (event: any) => {
+          let finalTranscript = '';
+          let interimTranscript = '';
+          for (let i = 0; i < event.results.length; ++i) {
+            if (event.results[i].isFinal) {
+              finalTranscript += event.results[i][0].transcript + ' ';
+            } else {
+              interimTranscript += event.results[i][0].transcript;
+            }
+          }
+
+          const spoken = (finalTranscript + interimTranscript).trim();
+          if (spoken) {
+            setLiveTranscript(spoken);
+            liveTranscriptRef.current = spoken;
+            const fullText = baseTextRef.current ? `${baseTextRef.current} ${spoken}` : spoken;
+            setText(fullText);
+
+            if (textareaRef.current) {
+              textareaRef.current.style.height = 'auto';
+              textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 128)}px`;
+            }
+          }
+        };
+
+        recognition.onerror = (event: any) => {
+          console.warn('SpeechRecognition error:', event.error);
+          if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+            setMicError('تم رفض صلاحية الميكروفون. يرجى السماح للمايك من إعدادات المتصفح أو أيقونة القفل بجوار الرابط.');
+            stopRecording();
+          } else if (event.error === 'network' || event.error === 'audio-capture') {
+            // Smoothly fallback to MediaRecorder + Gemini
+            if (recognitionRef.current) {
+              recognitionRef.current.onend = null;
+              recognitionRef.current.onerror = null;
+              try { recognitionRef.current.stop(); } catch (e) {}
+              recognitionRef.current = null;
+            }
+            startMediaRecorderFallback();
+          }
+          // 'no-speech' is non-fatal: user is simply pausing
+        };
+
+        recognition.onend = () => {
+          // If still recording, keep recognition alive across short pauses
+          if (isRecordingRef.current && recognitionRef.current) {
+            try {
+              recognition.start();
+            } catch (e) {
+              // ignore
+            }
+          }
+        };
+
+        recognition.start();
+        recognitionRef.current = recognition;
+        return;
+      } catch (err) {
+        console.warn('Web Speech API failed, falling back to MediaRecorder:', err);
+      }
+    }
+
+    // 2. Fallback: MediaRecorder + Gemini Multimodal Audio Transcription
+    await startMediaRecorderFallback();
+  };
+
+  const startMediaRecorderFallback = async () => {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       setMicError('المتصفح الحالي لا يدعم الوصول المباشر إلى الميكروفون.');
+      cleanupAudioResources();
       return;
     }
 
@@ -131,12 +231,14 @@ export const ChatInput: React.FC<ChatInputProps> = ({
       } else {
         setMicError('تعذر فتح الميكروفون. يرجى التأكد من توصيل المايك وإعطاء الإذن بالمتصفح.');
       }
+      cleanupAudioResources();
       return;
     }
 
     setIsRecording(true);
+    isRecordingRef.current = true;
 
-    // 2. Setup Audio Visualizer (AnalyserNode) to show animated waveform
+    // Real AudioContext frequency analyser
     try {
       const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
       if (AudioCtx) {
@@ -149,14 +251,13 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 
         const dataArray = new Uint8Array(analyser.frequencyBinCount);
         const updateMeter = () => {
-          if (!mediaStreamRef.current) return;
+          if (!mediaStreamRef.current || !isRecordingRef.current) return;
           analyser.getByteFrequencyData(dataArray);
           let sum = 0;
           for (let i = 0; i < dataArray.length; i++) {
             sum += dataArray[i];
           }
           const avg = sum / dataArray.length;
-          // Normalize volume 0 - 100
           setAudioVolume(Math.min(100, Math.round((avg / 128) * 100)));
           animFrameRef.current = requestAnimationFrame(updateMeter);
         };
@@ -166,12 +267,14 @@ export const ChatInput: React.FC<ChatInputProps> = ({
       console.warn('AudioContext visualizer not supported', e);
     }
 
-    // 3. Start second counter timer
-    timerIntervalRef.current = setInterval(() => {
-      setRecordingSeconds((prev) => prev + 1);
-    }, 1000);
+    // Start seconds counter if not running
+    if (!timerIntervalRef.current) {
+      timerIntervalRef.current = setInterval(() => {
+        setRecordingSeconds((prev) => prev + 1);
+      }, 1000);
+    }
 
-    // 4. Setup MediaRecorder with cross-browser MIME type
+    // MediaRecorder setup with supported MIME types
     let chosenMimeType = '';
     if (window.MediaRecorder) {
       const candidates = [
@@ -200,21 +303,11 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         };
 
         mediaRecorder.onstop = async () => {
-          // Stop media stream tracks now that recorder is fully stopped
           if (mediaStreamRef.current) {
             mediaStreamRef.current.getTracks().forEach((track) => track.stop());
             mediaStreamRef.current = null;
           }
 
-          // If browser speech recognition already produced a solid transcript, use it
-          const currentTranscript = liveTranscriptRef.current?.trim();
-          if (currentTranscript && currentTranscript.split(/\s+/).length >= 2) {
-            setText((prev) => (prev ? `${prev} ${currentTranscript}` : currentTranscript));
-            setLiveTranscript('');
-            return;
-          }
-
-          // Otherwise, send recorded audio to server-side Gemini transcription
           if (audioChunksRef.current.length > 0) {
             setIsTranscribing(true);
             try {
@@ -238,18 +331,21 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 
                     if (res.ok) {
                       const data = await res.json();
-                      if (data.transcript) {
-                        setText((prev) => (prev ? `${prev} ${data.transcript}` : data.transcript));
+                      if (data.transcript && data.transcript.trim()) {
+                        const tr = data.transcript.trim();
+                        setText((prev) => (prev ? `${prev} ${tr}` : tr));
+                        setLiveTranscript(tr);
+                        if (textareaRef.current) {
+                          textareaRef.current.style.height = 'auto';
+                          textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 128)}px`;
+                        }
                       }
-                    } else {
-                      console.warn('Transcription API error:', await res.text());
                     }
                   } catch (fetchErr) {
                     console.error('Failed to transcribe audio:', fetchErr);
                   }
                 }
                 setIsTranscribing(false);
-                setLiveTranscript('');
               };
               reader.readAsDataURL(audioBlob);
             } catch (err) {
@@ -259,61 +355,19 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           }
         };
 
-        mediaRecorder.start(200);
+        mediaRecorder.start(250);
         mediaRecorderRef.current = mediaRecorder;
       } catch (mrErr) {
         console.warn('Failed to start MediaRecorder:', mrErr);
       }
     }
-
-    // 5. Setup Web Speech API for real-time live preview (if supported by browser)
-    const SpeechRecognition =
-      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-
-    if (SpeechRecognition) {
-      try {
-        const recognition = new SpeechRecognition();
-        recognition.lang = 'ar-EG';
-        recognition.continuous = true;
-        recognition.interimResults = true;
-        recognition.maxAlternatives = 1;
-
-        let accumulated = '';
-
-        recognition.onresult = (event: any) => {
-          let interim = '';
-          for (let i = event.resultIndex; i < event.results.length; i++) {
-            const transcriptChunk = event.results[i][0].transcript;
-            if (event.results[i].isFinal) {
-              accumulated += (accumulated ? ' ' : '') + transcriptChunk;
-            } else {
-              interim += transcriptChunk;
-            }
-          }
-          const fullText = (accumulated + (interim ? ' ' + interim : '')).trim();
-          setLiveTranscript(fullText);
-          liveTranscriptRef.current = fullText;
-        };
-
-        recognition.onerror = (event: any) => {
-          console.warn('SpeechRecognition warning:', event.error);
-          // Don't kill recording if MediaRecorder is active
-        };
-
-        recognition.onend = () => {
-          // Normal termination
-        };
-
-        recognition.start();
-        recognitionRef.current = recognition;
-      } catch (err) {
-        console.warn('SpeechRecognition init error:', err);
-      }
-    }
   };
 
   const stopRecording = () => {
-    // 1. Stop timer & visualizer
+    isRecordingRef.current = false;
+    setIsRecording(false);
+    setAudioVolume(0);
+
     if (timerIntervalRef.current) {
       clearInterval(timerIntervalRef.current);
       timerIntervalRef.current = null;
@@ -331,9 +385,11 @@ export const ChatInput: React.FC<ChatInputProps> = ({
       audioContextRef.current = null;
     }
 
-    // 2. Stop speech recognition
     if (recognitionRef.current) {
       try {
+        recognitionRef.current.onend = null;
+        recognitionRef.current.onerror = null;
+        recognitionRef.current.onresult = null;
         recognitionRef.current.stop();
       } catch (e) {
         // ignore
@@ -341,7 +397,6 @@ export const ChatInput: React.FC<ChatInputProps> = ({
       recognitionRef.current = null;
     }
 
-    // 3. Stop MediaRecorder (triggers onstop to transcribe audio)
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       try {
         mediaRecorderRef.current.stop();
@@ -351,17 +406,15 @@ export const ChatInput: React.FC<ChatInputProps> = ({
       mediaRecorderRef.current = null;
     }
 
-    setIsRecording(false);
-    setAudioVolume(0);
-
-    // Focus textarea
     setTimeout(() => {
       textareaRef.current?.focus();
     }, 150);
   };
 
   const cancelRecording = () => {
+    isRecordingRef.current = false;
     cleanupAudioResources();
+    setText(baseTextRef.current);
     setLiveTranscript('');
     liveTranscriptRef.current = '';
     audioChunksRef.current = [];

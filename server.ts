@@ -485,7 +485,10 @@ app.post('/api/transcribe', async (req, res) => {
       },
     });
 
-    const transcript = response.text?.trim().replace(/^["'«»]+|["'«»]+$/g, '') || '';
+    let transcript = response.text?.trim().replace(/^["'«»]+|["'«»]+$/g, '') || '';
+    if (/^(silence|صمت|لا يوجد صوت|بدون صوت)[\.\s]*$/i.test(transcript)) {
+      transcript = '';
+    }
     res.json({ transcript });
   } catch (err: any) {
     console.error('Transcription error:', err);
