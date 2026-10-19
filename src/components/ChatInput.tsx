@@ -112,104 +112,10 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     audioChunksRef.current = [];
     setRecordingSeconds(0);
     baseTextRef.current = text.trim();
-    isRecordingRef.current = true;
-    setIsRecording(true);
 
-    // 1. Primary: Direct Native Web Speech API (Chrome, Edge, Safari, Android)
-    const SpeechRec = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-
-    if (SpeechRec) {
-      try {
-        const recognition = new SpeechRec();
-        recognition.lang = 'ar-EG';
-        recognition.continuous = true;
-        recognition.interimResults = true;
-        recognition.maxAlternatives = 1;
-
-        // Visual equalizer animation & seconds counter
-        timerIntervalRef.current = setInterval(() => {
-          setRecordingSeconds((prev) => prev + 1);
-        }, 1000);
-
-        const simulateWave = () => {
-          if (!isRecordingRef.current) return;
-          const randomVol = Math.floor(25 + Math.random() * 55);
-          setAudioVolume(randomVol);
-          animFrameRef.current = requestAnimationFrame(() => {
-            setTimeout(simulateWave, 100);
-          });
-        };
-        simulateWave();
-
-        recognition.onresult = (event: any) => {
-          let finalTranscript = '';
-          let interimTranscript = '';
-          for (let i = 0; i < event.results.length; ++i) {
-            if (event.results[i].isFinal) {
-              finalTranscript += event.results[i][0].transcript + ' ';
-            } else {
-              interimTranscript += event.results[i][0].transcript;
-            }
-          }
-
-          const spoken = (finalTranscript + interimTranscript).trim();
-          if (spoken) {
-            setLiveTranscript(spoken);
-            liveTranscriptRef.current = spoken;
-            const fullText = baseTextRef.current ? `${baseTextRef.current} ${spoken}` : spoken;
-            setText(fullText);
-
-            if (textareaRef.current) {
-              textareaRef.current.style.height = 'auto';
-              textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 128)}px`;
-            }
-          }
-        };
-
-        recognition.onerror = (event: any) => {
-          console.warn('SpeechRecognition error:', event.error);
-          if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
-            setMicError('تم رفض صلاحية الميكروفون. يرجى السماح للمايك من إعدادات المتصفح أو أيقونة القفل بجوار الرابط.');
-            stopRecording();
-          } else if (event.error === 'network' || event.error === 'audio-capture') {
-            // Smoothly fallback to MediaRecorder + Gemini
-            if (recognitionRef.current) {
-              recognitionRef.current.onend = null;
-              recognitionRef.current.onerror = null;
-              try { recognitionRef.current.stop(); } catch (e) {}
-              recognitionRef.current = null;
-            }
-            startMediaRecorderFallback();
-          }
-          // 'no-speech' is non-fatal: user is simply pausing
-        };
-
-        recognition.onend = () => {
-          // If still recording, keep recognition alive across short pauses
-          if (isRecordingRef.current && recognitionRef.current) {
-            try {
-              recognition.start();
-            } catch (e) {
-              // ignore
-            }
-          }
-        };
-
-        recognition.start();
-        recognitionRef.current = recognition;
-        return;
-      } catch (err) {
-        console.warn('Web Speech API failed, falling back to MediaRecorder:', err);
-      }
-    }
-
-    // 2. Fallback: MediaRecorder + Gemini Multimodal Audio Transcription
-    await startMediaRecorderFallback();
-  };
-
-  const startMediaRecorderFallback = async () => {
+    // 1. Check support and request microphone access directly
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      setMicError('المتصفح الحالي لا يدعم الوصول المباشر إلى الميكروفون.');
+      setMicError('متصفحك الحالي لا يدعم الوصول المباشر إلى الميكروفون. يرجى تجربة متصفح حديث مثل Chrome أو Edge.');
       cleanupAudioResources();
       return;
     }
@@ -227,7 +133,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     } catch (err: any) {
       console.warn('Microphone access denied:', err);
       if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-        setMicError('تم رفض صلاحية الميكروفون. يرجى السماح بالوصول من إعدادات المتصفح أو أيقونة القفل بجوار الرابط.');
+        setMicError('تم حظر صلاحية الميكروفون. يرجى السماح بالوصول من إعدادات المتصفح أو أيقونة القفل 🔒 بجوار الرابط.');
       } else {
         setMicError('تعذر فتح الميكروفون. يرجى التأكد من توصيل المايك وإعطاء الإذن بالمتصفح.');
       }
@@ -238,7 +144,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     setIsRecording(true);
     isRecordingRef.current = true;
 
-    // Real AudioContext frequency analyser
+    // 2. Real AudioContext frequency analyser (waveform bounciness confirms audio input)
     try {
       const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
       if (AudioCtx) {
@@ -267,14 +173,12 @@ export const ChatInput: React.FC<ChatInputProps> = ({
       console.warn('AudioContext visualizer not supported', e);
     }
 
-    // Start seconds counter if not running
-    if (!timerIntervalRef.current) {
-      timerIntervalRef.current = setInterval(() => {
-        setRecordingSeconds((prev) => prev + 1);
-      }, 1000);
-    }
+    // 3. Start second counter timer
+    timerIntervalRef.current = setInterval(() => {
+      setRecordingSeconds((prev) => prev + 1);
+    }, 1000);
 
-    // MediaRecorder setup with supported MIME types
+    // 4. Setup MediaRecorder with cross-browser MIME type
     let chosenMimeType = '';
     if (window.MediaRecorder) {
       const candidates = [
@@ -303,11 +207,28 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         };
 
         mediaRecorder.onstop = async () => {
+          // Release media stream tracks
           if (mediaStreamRef.current) {
             mediaStreamRef.current.getTracks().forEach((track) => track.stop());
             mediaStreamRef.current = null;
           }
+          if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+            try { audioContextRef.current.close(); } catch (e) {}
+            audioContextRef.current = null;
+          }
 
+          // If browser speech recognition already captured a full sentence, keep it
+          const currentWords = liveTranscriptRef.current?.trim() || '';
+          if (currentWords.length > 5 && currentWords.split(/\s+/).length >= 2) {
+            setText((prev) => {
+              if (!prev || prev.includes(currentWords)) return prev || currentWords;
+              return `${prev} ${currentWords}`.trim();
+            });
+            setLiveTranscript('');
+            return;
+          }
+
+          // Otherwise, audioChunksRef has the real recorded microphone audio! Send to Gemini
           if (audioChunksRef.current.length > 0) {
             setIsTranscribing(true);
             try {
@@ -315,39 +236,46 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                 type: chosenMimeType || 'audio/webm',
               });
 
-              const reader = new FileReader();
-              reader.onloadend = async () => {
-                const base64Data = (reader.result as string)?.split(',')[1];
-                if (base64Data) {
-                  try {
-                    const res = await fetch('/api/transcribe', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({
-                        audioData: base64Data,
-                        mimeType: chosenMimeType || 'audio/webm',
-                      }),
-                    });
+              if (audioBlob.size > 400) {
+                const reader = new FileReader();
+                reader.onloadend = async () => {
+                  const base64Data = (reader.result as string)?.split(',')[1];
+                  if (base64Data) {
+                    try {
+                      const res = await fetch('/api/transcribe', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          audioData: base64Data,
+                          mimeType: chosenMimeType || 'audio/webm',
+                        }),
+                      });
 
-                    if (res.ok) {
-                      const data = await res.json();
-                      if (data.transcript && data.transcript.trim()) {
-                        const tr = data.transcript.trim();
-                        setText((prev) => (prev ? `${prev} ${tr}` : tr));
-                        setLiveTranscript(tr);
-                        if (textareaRef.current) {
-                          textareaRef.current.style.height = 'auto';
-                          textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 128)}px`;
+                      if (res.ok) {
+                        const data = await res.json();
+                        if (data.transcript && data.transcript.trim()) {
+                          const tr = data.transcript.trim();
+                          setText((prev) => {
+                            const base = baseTextRef.current ? `${baseTextRef.current} ` : '';
+                            return `${base}${tr}`.trim();
+                          });
+                          setLiveTranscript('');
+                          if (textareaRef.current) {
+                            textareaRef.current.style.height = 'auto';
+                            textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 128)}px`;
+                          }
                         }
                       }
+                    } catch (fetchErr) {
+                      console.error('Failed to transcribe audio:', fetchErr);
                     }
-                  } catch (fetchErr) {
-                    console.error('Failed to transcribe audio:', fetchErr);
                   }
-                }
+                  setIsTranscribing(false);
+                };
+                reader.readAsDataURL(audioBlob);
+              } else {
                 setIsTranscribing(false);
-              };
-              reader.readAsDataURL(audioBlob);
+              }
             } catch (err) {
               console.error('Error preparing audio blob:', err);
               setIsTranscribing(false);
@@ -355,10 +283,57 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           }
         };
 
-        mediaRecorder.start(250);
+        // Record small time slices continuously (100ms)
+        mediaRecorder.start(100);
         mediaRecorderRef.current = mediaRecorder;
       } catch (mrErr) {
         console.warn('Failed to start MediaRecorder:', mrErr);
+      }
+    }
+
+    // 5. Run Web Speech API concurrently for real-time live preview (if supported)
+    const SpeechRec = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (SpeechRec) {
+      try {
+        const recognition = new SpeechRec();
+        recognition.lang = 'ar-EG';
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        recognition.maxAlternatives = 1;
+
+        recognition.onresult = (event: any) => {
+          let finalTranscript = '';
+          let interimTranscript = '';
+          for (let i = 0; i < event.results.length; ++i) {
+            if (event.results[i].isFinal) {
+              finalTranscript += event.results[i][0].transcript + ' ';
+            } else {
+              interimTranscript += event.results[i][0].transcript;
+            }
+          }
+
+          const spoken = (finalTranscript + interimTranscript).trim();
+          if (spoken) {
+            setLiveTranscript(spoken);
+            liveTranscriptRef.current = spoken;
+            const fullText = baseTextRef.current ? `${baseTextRef.current} ${spoken}` : spoken;
+            setText(fullText);
+
+            if (textareaRef.current) {
+              textareaRef.current.style.height = 'auto';
+              textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 128)}px`;
+            }
+          }
+        };
+
+        recognition.onerror = (event: any) => {
+          console.warn('SpeechRecognition live preview warning:', event.error);
+        };
+
+        recognition.start();
+        recognitionRef.current = recognition;
+      } catch (err) {
+        console.warn('Web Speech API preview not initialized:', err);
       }
     }
   };
@@ -376,14 +351,6 @@ export const ChatInput: React.FC<ChatInputProps> = ({
       cancelAnimationFrame(animFrameRef.current);
       animFrameRef.current = null;
     }
-    if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
-      try {
-        audioContextRef.current.close();
-      } catch (e) {
-        // ignore
-      }
-      audioContextRef.current = null;
-    }
 
     if (recognitionRef.current) {
       try {
@@ -391,18 +358,17 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         recognitionRef.current.onerror = null;
         recognitionRef.current.onresult = null;
         recognitionRef.current.stop();
-      } catch (e) {
-        // ignore
-      }
+      } catch (e) {}
       recognitionRef.current = null;
     }
 
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       try {
+        if (typeof mediaRecorderRef.current.requestData === 'function') {
+          mediaRecorderRef.current.requestData();
+        }
         mediaRecorderRef.current.stop();
-      } catch (e) {
-        // ignore
-      }
+      } catch (e) {}
       mediaRecorderRef.current = null;
     }
 
