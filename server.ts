@@ -278,28 +278,30 @@ app.post('/api/chat/stream', async (req, res) => {
     res.flushHeaders?.();
 
     let responseStream;
-    let usedModel = 'gemini-3.8-flash';
+    let usedModel = 'gemini-3.1-flash-lite';
 
     try {
       responseStream = await ai.models.generateContentStream({
-        model: 'gemini-3.8-flash',
+        model: 'gemini-3.1-flash-lite',
         contents,
         config: {
           systemInstruction,
-          temperature: 0.25,
+          temperature: 0.2,
+          thinkingConfig: { thinkingBudget: 0 },
         },
       });
     } catch (primaryErr: any) {
-      console.warn('Primary model (gemini-3.8-flash) returned error, attempting fallback to gemini-3.1-flash-lite:', primaryErr?.message);
-      // Automatic fallback for 503 high demand or transient server errors
-      usedModel = 'gemini-3.1-flash-lite';
+      console.warn('Primary model (gemini-3.1-flash-lite) returned error, attempting fallback to gemini-3.8-flash:', primaryErr?.message);
+      // Automatic fallback if needed
+      usedModel = 'gemini-3.8-flash';
       try {
         responseStream = await ai.models.generateContentStream({
-          model: 'gemini-3.1-flash-lite',
+          model: 'gemini-3.8-flash',
           contents,
           config: {
             systemInstruction,
-            temperature: 0.25,
+            temperature: 0.2,
+            thinkingConfig: { thinkingBudget: 0 },
           },
         });
       } catch (fallbackErr: any) {
