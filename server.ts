@@ -1,5 +1,4 @@
 import express from 'express';
-import { createServer as createViteServer } from 'vite';
 import dotenv from 'dotenv';
 import path from 'path';
 import { GoogleGenAI } from '@google/genai';
@@ -608,25 +607,31 @@ const isVercel = Boolean(process.env.VERCEL);
 const isProd = process.env.NODE_ENV === 'production' || isVercel;
 
 if (!isVercel) {
+  const PORT = Number(process.env.PORT) || 3000;
   if (isProd) {
     app.use(express.static('dist'));
     app.get('*', (req, res) => {
       res.sendFile(path.resolve('dist', 'index.html'));
     });
-  } else {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: 'spa',
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`Server listening on http://0.0.0.0:${PORT}`);
     });
-    app.use(vite.middlewares);
+  } else {
+    // Dynamic import to avoid bundling Vite inside production serverless functions
+    const vitePkg = 'vite';
+    import(vitePkg).then(async ({ createServer }) => {
+      const vite = await createServer({
+        server: { middlewareMode: true },
+        appType: 'spa',
+      });
+      app.use(vite.middlewares);
+      app.listen(PORT, '0.0.0.0', () => {
+        console.log(`Server listening on http://0.0.0.0:${PORT}`);
+      });
+    }).catch((err) => {
+      console.error('Failed to initialize Vite dev server:', err);
+    });
   }
-}
-
-const PORT = Number(process.env.PORT) || 3000;
-if (!isVercel) {
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server listening on http://0.0.0.0:${PORT}`);
-  });
 }
 
 export default app;
