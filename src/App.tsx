@@ -155,8 +155,20 @@ export default function App() {
       body: JSON.stringify({ pdfBase64, fileName, defaultCategory }),
     });
     if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.error || 'فشل رفع ملف الـ PDF');
+      let errorMsg = 'فشل رفع ملف الـ PDF';
+      try {
+        const err = await res.json();
+        if (err.error) errorMsg = err.error;
+      } catch {
+        if (res.status === 413) {
+          errorMsg = 'حجم ملف الـ PDF كبير جداً ويتجاوز سعة النقل المباشر. علماً بأن القانون 148 ولائحته 2437 مدمجة بالكامل مسبقاً داخل النظام!';
+        } else if (res.status === 504 || res.status === 408) {
+          errorMsg = 'استغرقت معالجة الملف وقتاً طويلاً لكبر حجمه ومئات صفحاته. علماً بأن القانون 148 ولائحته 2437 مدمجة بالفعل.';
+        } else {
+          errorMsg = `فشل الخادم في معالجة الملف (${res.status})`;
+        }
+      }
+      throw new Error(errorMsg);
     }
     const data = await res.json();
     setCustomDocs((prev) => [...prev, data.document]);

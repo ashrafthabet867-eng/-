@@ -149,8 +149,33 @@ app.delete('/api/documents/:id', (req, res) => {
   res.json({ success: true });
 });
 
+// Helper to safely parse JSON or extract fields from truncated/malformed response
+function safeParseJson(raw: string): any {
+  if (!raw) return {};
+  const cleaned = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+  try {
+    return JSON.parse(cleaned);
+  } catch (err) {
+    // Fallback extraction with regex if model output was cut off
+    const titleMatch = cleaned.match(/"title"\s*:\s*"([^"\\]*(?:\\.[^"\\]*)*)"/);
+    const numberMatch = cleaned.match(/"number"\s*:\s*"([^"\\]*(?:\\.[^"\\]*)*)"/);
+    const categoryMatch = cleaned.match(/"category"\s*:\s*"([^"\\]*(?:\\.[^"\\]*)*)"/);
+    const summaryMatch = cleaned.match(/"summary"\s*:\s*"([^"\\]*(?:\\.[^"\\]*)*)"/);
+    const fullTextMatch = cleaned.match(/"fullText"\s*:\s*"([^"\\]*(?:\\.[^"\\]*)*)"/);
+
+    return {
+      title: titleMatch ? titleMatch[1].replace(/\\"/g, '"') : undefined,
+      number: numberMatch ? numberMatch[1].replace(/\\"/g, '"') : undefined,
+      category: categoryMatch ? categoryMatch[1] : undefined,
+      summary: summaryMatch ? summaryMatch[1].replace(/\\"/g, '"') : undefined,
+      fullText: fullTextMatch ? fullTextMatch[1].replace(/\\"/g, '"') : cleaned.slice(0, 4000),
+    };
+  }
+}
+
 // Endpoint: Upload and analyze PDF document (Law 148, Reg 2437, Tables, or Circulars)
 app.post('/api/documents/upload-pdf', async (req, res) => {
+  req.setTimeout(180000); // 3 minutes timeout for PDF processing
   try {
     if (!apiKey) {
       return res.status(500).json({ error: 'مفتاح Gemini API غير مهيأ بالخادم.' });
@@ -161,16 +186,16 @@ app.post('/api/documents/upload-pdf', async (req, res) => {
     }
 
     const prompt = `أنت مستشار توثيق وفهرسة تشريعات التأمينات الاجتماعية بالهيئة القومية للتأمين الاجتماعي بجمهورية مصر العربية.
-المهمة: تحليل وقراءة ملف الـ PDF المرفق بدقة (سواء كان نصوص القانون 148 لسنة 2019، أو اللائحة التنفيذية رقم 2437 لسنة 2021، أو أحد الجداول التأمينية المرفقة، أو الكتب الدورية والقرارات الوزارية والتعديلات).
-قم باستخراج المحتوى القانوني والتشريعي الكامل للملف في شكل كائن JSON مطابق للمخطط التالي:
+المهمة: تحليل وقراءة ملف الـ PDF المرفق وفهرسته بدقة.
+استخرج المحتوى في كائن JSON مختصر وقانوني دقيق مطابق للمخطط التالي:
 {
-  "title": "عنوان رسمي دقيق ومحدد للوثيقة (مثال: نصوص اللائحة التنفيذية رقم 2437 لسنة 2021 - أو جدول رقم 5 للمعامل الاكتواري)",
-  "number": "رقم القرار أو المادة أو القانون أو الجدول (مثال: قرار رئيس الوزراء رقم 2437 لسنة 2021 / جدول رقم 7)",
+  "title": "عنوان رسمي محدد للوثيقة (مثال: نصوص اللائحة التنفيذية رقم 2437 لسنة 2021 أو قرار وزاري)",
+  "number": "رقم القرار أو المادة أو القانون أو الجدول",
   "category": "إحدى القيم التالية فقط: pensions أو early_retirement أو survivors أو contributions أو work_injury أو grants أو forms أو tables",
-  "summary": "موجز قانوني تنفيذي للمحتوى في أسطر معدودة يوضح أهم الحقوق والشروط والالتزامات",
-  "fullText": "النصوص والمواد والقرارات الكاملة والجداول والنسب المستخرجة من الوثيقة بدقة",
-  "conditions": ["شرط 1", "شرط 2", ...],
-  "requiredDocs": ["مستند مطلوب 1", "مستند مطلوب 2", ...]
+  "summary": "موجز قانوني تنفيذي للمحتوى يوضح أهم الحقوق والشروط والالتزامات",
+  "fullText": "خلاصة المواد والأحكام والقرارات والنسب المستخرجة من الوثيقة (في حدود 2000 كلمة من أهم النصوص الحاكمة)",
+  "conditions": ["شرط 1", "شرط 2"],
+  "requiredDocs": ["مستند مطلوب 1", "مستند مطلوب 2"]
 }
 أعد فقط كائن JSON الصالح بدون أي نصوص أو markdown قبله أو بعده.`;
 
@@ -198,23 +223,31 @@ app.post('/api/documents/upload-pdf', async (req, res) => {
       },
     });
 
-    const parsed = JSON.parse(response.text || '{}');
+    const parsed = safeParseJson(response.text || '{}');
     const newDoc: LegalArticle = {
       id: `custom-pdf-${Date.now()}`,
       title: parsed.title || fileName || 'مستند PDF قانوني معتمد',
       number: parsed.number || 'ملف PDF ملحق',
       category: parsed.category || defaultCategory || 'pensions',
       summary: parsed.summary || parsed.title || 'مستند صادر بملف PDF رسمي',
-      fullText: parsed.fullText || 'نصوص الملف المرفق',
-      conditions: parsed.conditions || [],
-      requiredDocs: parsed.requiredDocs || [],
+      fullText: parsed.fullText || 'نصوص ومواد الملف المرفق',
+      conditions: Array.isArray(parsed.conditions) ? parsed.conditions : [],
+      requiredDocs: Array.isArray(parsed.requiredDocs) ? parsed.requiredDocs : [],
     };
 
     customLawDocs.push(newDoc);
     res.json({ success: true, document: newDoc });
   } catch (err: any) {
     console.error('PDF ingestion error:', err);
-    res.status(500).json({ error: 'حدث خطأ أثناء فحص وتحليل ملف الـ PDF: ' + (err.message || '') });
+    let userMsg = 'حدث خطأ أثناء فحص وتحليل ملف الـ PDF';
+    if (err.message && (err.message.includes('503') || err.message.includes('high demand'))) {
+      userMsg = 'الخدمة تشهد ضغطاً مؤقتاً في معالجة المستندات الكبيرة. يرجى إعادة المحاولة بعد لحظات، علماً بأن نصوص القانون 148 ولائحته 2437 مدمجة بالكامل مسبقاً.';
+    } else if (err.message && err.message.includes('ResourceExhausted')) {
+      userMsg = 'الملف يحتوي على عدد صفحات كبير جداً يتجاوز حد المعالجة اللحظية. علماً بأن القانون 148 ولائحته 2437 مدمجة بالكامل في التطبيق.';
+    } else if (err.message) {
+      userMsg += `: ${err.message}`;
+    }
+    res.status(500).json({ error: userMsg });
   }
 });
 

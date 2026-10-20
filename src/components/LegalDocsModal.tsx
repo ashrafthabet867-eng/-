@@ -414,21 +414,33 @@ export const LegalDocsModal: React.FC<LegalDocsModalProps> = ({
           {/* TAB 2: UPLOAD & PROCESS PDF OF LAW 148 / REG 2437 / CIRCULARS */}
           {activeTab === 'upload-pdf' && (
             <div className="space-y-4">
-              <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 text-emerald-950 text-xs sm:text-sm">
-                <div className="flex items-center gap-2 font-bold mb-1 text-emerald-900">
-                  <ShieldCheck className="w-5 h-5 text-emerald-700" />
-                  <span>تضمين نسخة PDF من القانون 148 ولائحته 2437 والجداول في ذاكرة المستشار</span>
+              <div className="bg-emerald-50 border border-emerald-300 rounded-2xl p-4 text-emerald-950 text-xs sm:text-sm shadow-xs">
+                <div className="flex items-center gap-2 font-bold mb-1.5 text-emerald-900">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-700 flex-shrink-0" />
+                  <span className="text-sm">قانون 148 ولائحته 2437 وجداوله مدمجة بالفعل وجاهزة 100%!</span>
                 </div>
                 <p className="text-emerald-800 leading-relaxed text-xs">
-                  يمكنك هنا رفع ملف الـ PDF الخاص بالقانون 148 لسنة 2019، أو اللائحة التنفيذية رقم 2437 لسنة 2021، أو الجداول المرفقة، أو الكتب الدورية وقرارات زيادة الأجور والمعاشات.
-                  سيقوم الذكاء الاصطناعي بقراءة وفحص ملف الـ PDF مباشرة واستخراج كافة مواده وجداوله وتضمينها فوراً في قاعدة المعرفة المعتمدة للمستشار للإجابة بناءً عليها.
+                  نصوص <strong>قانون التأمينات رقم 148 لسنة 2019</strong> واللائحة التنفيذية رقم <strong>2437 لسنة 2021</strong> وكافة الجداول الرسمية (1، 2، 5، 7) 
+                  <strong> مدمجة ومفهرسة مسبقاً بالكامل</strong> في ذاكرة المستشار في تبويب <strong>«نصوص القانون والجداول المعتمدة»</strong>.
+                  لست بحاجة لرفع ملف القانون مرة أخرى؛ يمكنك سؤاله مباشرة في الشات وسيجيبك بدقة المواد الرسمية.
                 </p>
+                <div className="mt-2.5 text-[11px] text-emerald-900 font-semibold bg-emerald-100/80 border border-emerald-200 rounded-xl px-3 py-1.5 inline-block">
+                  💡 هذا القسم مخصص للكتب الدورية الجديدة أو القرارات الوزارية الخاصة الملحقة (ملفات PDF حتى 20-30 صفحة).
+                </div>
               </div>
 
               {pdfUploadError && (
-                <div className="bg-rose-50 border border-rose-300 text-rose-900 p-3 rounded-xl flex items-center gap-2 text-xs sm:text-sm">
-                  <AlertCircle className="w-5 h-5 text-rose-600 flex-shrink-0" />
-                  <span>{pdfUploadError}</span>
+                <div className="bg-rose-50 border border-rose-300 text-rose-950 p-3.5 rounded-2xl flex flex-col gap-2 text-xs sm:text-sm shadow-xs animate-fadeIn">
+                  <div className="flex items-center gap-2 font-bold text-rose-900">
+                    <AlertCircle className="w-5 h-5 text-rose-600 flex-shrink-0" />
+                    <span>تنبيه بشأن فحص الملف:</span>
+                  </div>
+                  <p className="text-rose-800 leading-relaxed text-xs font-medium">
+                    {pdfUploadError}
+                  </p>
+                  <p className="text-[11px] text-slate-700 bg-white/90 p-2 rounded-xl border border-rose-200">
+                    ℹ️ إذا كان الملف الذي تحاول رفعه هو ملف القانون 148 أو اللائحة 2437، فهو مدمج بالفعل في النظام ومتاح في التبويب الأول، ويمكنك الاستفسار عن أي مادة أو جدول فوراً في المحادثة.
+                  </p>
                 </div>
               )}
 
