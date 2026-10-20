@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { Send, Mic, MicOff, X, Paperclip, Loader2, Check } from 'lucide-react';
+import { Send, Mic, MicOff, X, Paperclip, Loader2, Check, Lock, RotateCcw, HelpCircle, ShieldAlert, CheckCircle2 } from 'lucide-react';
 import { ResponseMode } from '../types';
 
 interface ChatInputProps {
@@ -29,6 +29,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [liveTranscript, setLiveTranscript] = useState('');
   const [micError, setMicError] = useState<string | null>(null);
+  const [showMicHelpModal, setShowMicHelpModal] = useState<boolean>(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -42,6 +43,13 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   const liveTranscriptRef = useRef<string>('');
   const isRecordingRef = useRef<boolean>(false);
   const baseTextRef = useRef<string>('');
+  const shouldSubmitOnStopRef = useRef<boolean>(true);
+  const imagePreviewRef = useRef<typeof imagePreview>(null);
+
+  // Keep imagePreviewRef in sync
+  useEffect(() => {
+    imagePreviewRef.current = imagePreview;
+  }, [imagePreview]);
 
   // Keep liveTranscriptRef in sync
   useEffect(() => {
@@ -122,18 +130,26 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 
     let stream: MediaStream;
     try {
-      stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-        },
-      });
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+          },
+        });
+      } catch (constraintErr) {
+        // Fallback for Windows/Edge devices where advanced constraints trigger issues
+        console.warn('Advanced audio constraints failed, falling back to plain audio:', constraintErr);
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      }
       mediaStreamRef.current = stream;
     } catch (err: any) {
       console.warn('Microphone access denied:', err);
       if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-        setMicError('تم حظر صلاحية الميكروفون. يرجى السماح بالوصول من إعدادات المتصفح أو أيقونة القفل 🔒 بجوار الرابط.');
+        setMicError('المتصفح حظر إذن الميكروفون لحماية خصوصيتك. اضغط "كيف أفعّله؟" للحل في خطوتين.');
+      } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+        setMicError('لم يتم العثور على ميكروفون موصول بجهازك. يرجى توصيل مايكروفون أو سماعة.');
       } else {
         setMicError('تعذر فتح الميكروفون. يرجى التأكد من توصيل المايك وإعطاء الإذن بالمتصفح.');
       }
@@ -217,18 +233,27 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             audioContextRef.current = null;
           }
 
-          // If browser speech recognition already captured a full sentence, keep it
-          const currentWords = liveTranscriptRef.current?.trim() || '';
-          if (currentWords.length > 5 && currentWords.split(/\s+/).length >= 2) {
-            setText((prev) => {
-              if (!prev || prev.includes(currentWords)) return prev || currentWords;
-              return `${prev} ${currentWords}`.trim();
-            });
-            setLiveTranscript('');
-            return;
+          // 1. If browser speech recognition already captured speech, evaluate it
+          const currentWords = (liveTranscriptRef.current || '').trim();
+          if (currentWords.length >= 2) {
+            const finalQuery = (baseTextRef.current ? `${baseTextRef.current} ${currentWords}` : currentWords).trim();
+            if (shouldSubmitOnStopRef.current && finalQuery.length > 0) {
+              setText('');
+              setLiveTranscript('');
+              liveTranscriptRef.current = '';
+              audioChunksRef.current = [];
+              const attachedImg = imagePreviewRef.current;
+              setImagePreview(null);
+              onSendMessage(finalQuery, attachedImg || undefined);
+              return;
+            } else {
+              setText(finalQuery);
+              setLiveTranscript('');
+              return;
+            }
           }
 
-          // Otherwise, audioChunksRef has the real recorded microphone audio! Send to Gemini
+          // 2. Otherwise, audioChunksRef has the recorded microphone audio! Send to Gemini
           if (audioChunksRef.current.length > 0) {
             setIsTranscribing(true);
             try {
@@ -255,14 +280,22 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                         const data = await res.json();
                         if (data.transcript && data.transcript.trim()) {
                           const tr = data.transcript.trim();
-                          setText((prev) => {
-                            const base = baseTextRef.current ? `${baseTextRef.current} ` : '';
-                            return `${base}${tr}`.trim();
-                          });
-                          setLiveTranscript('');
-                          if (textareaRef.current) {
-                            textareaRef.current.style.height = 'auto';
-                            textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 128)}px`;
+                          const finalQuery = (baseTextRef.current ? `${baseTextRef.current} ${tr}` : tr).trim();
+                          if (shouldSubmitOnStopRef.current && finalQuery.length > 0) {
+                            setText('');
+                            setLiveTranscript('');
+                            liveTranscriptRef.current = '';
+                            audioChunksRef.current = [];
+                            const attachedImg = imagePreviewRef.current;
+                            setImagePreview(null);
+                            onSendMessage(finalQuery, attachedImg || undefined);
+                          } else {
+                            setText(finalQuery);
+                            setLiveTranscript('');
+                            if (textareaRef.current) {
+                              textareaRef.current.style.height = 'auto';
+                              textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 128)}px`;
+                            }
                           }
                         }
                       }
@@ -338,7 +371,8 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     }
   };
 
-  const stopRecording = () => {
+  const stopRecording = (shouldSubmit: boolean = true) => {
+    shouldSubmitOnStopRef.current = shouldSubmit;
     isRecordingRef.current = false;
     setIsRecording(false);
     setAudioVolume(0);
@@ -370,6 +404,17 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         mediaRecorderRef.current.stop();
       } catch (e) {}
       mediaRecorderRef.current = null;
+    } else {
+      // If MediaRecorder was inactive (e.g. pure speech synthesis recognition)
+      const words = (liveTranscriptRef.current || text || '').trim();
+      if (shouldSubmit && words.length > 0) {
+        setText('');
+        setLiveTranscript('');
+        liveTranscriptRef.current = '';
+        const img = imagePreviewRef.current;
+        setImagePreview(null);
+        onSendMessage(words, img || undefined);
+      }
     }
 
     setTimeout(() => {
@@ -388,7 +433,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 
   const handleToggleRecord = () => {
     if (isRecording) {
-      stopRecording();
+      stopRecording(true);
     } else {
       startRecording();
     }
@@ -419,10 +464,12 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 
   const handleSend = () => {
     if (isRecording) {
-      stopRecording();
+      stopRecording(true);
+      return;
     }
-    if ((!text.trim() && !imagePreview) || isLoading || isTranscribing) return;
-    onSendMessage(text.trim(), imagePreview || undefined);
+    const msgToSend = (text || liveTranscriptRef.current || '').trim();
+    if ((!msgToSend && !imagePreview) || isLoading || isTranscribing) return;
+    onSendMessage(msgToSend, imagePreview || undefined);
     setText('');
     setLiveTranscript('');
     liveTranscriptRef.current = '';
@@ -493,20 +540,28 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             </div>
 
             {/* Action buttons */}
-            <div className="flex items-center gap-2 flex-shrink-0">
+            <div className="flex items-center gap-1.5 flex-shrink-0">
               <button
                 type="button"
-                onClick={stopRecording}
-                className="flex items-center gap-1.5 bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white px-3 py-1.5 rounded-xl text-xs font-bold transition-all shadow-sm cursor-pointer"
-                title="إنهاء التسجيل وتحويل الصوت لنص"
+                onClick={() => stopRecording(true)}
+                className="flex items-center gap-1.5 bg-emerald-700 hover:bg-emerald-800 active:bg-emerald-900 text-white px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all shadow-md cursor-pointer active:scale-95"
+                title="إنهاء التسجيل وإرسال السؤال فوراً للمستشار للإجابة عليه"
               >
-                <Check className="w-4 h-4" />
-                <span>تم</span>
+                <Send className="w-3.5 h-3.5 rotate-180" />
+                <span>إرسال وإجابة</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => stopRecording(false)}
+                className="flex items-center gap-1 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 px-2.5 py-1.5 rounded-xl text-xs font-semibold transition-all shadow-2xs cursor-pointer"
+                title="كتابة النص فقط بالمربع لتعديله ومراجعته قبل الإرسال"
+              >
+                <span>تعديل</span>
               </button>
               <button
                 type="button"
                 onClick={cancelRecording}
-                className="p-1.5 text-slate-500 hover:text-slate-700 rounded-xl hover:bg-rose-100/80 transition-colors cursor-pointer"
+                className="p-1.5 text-slate-500 hover:text-rose-700 rounded-xl hover:bg-rose-100 transition-colors cursor-pointer"
                 title="إلغاء التسجيل"
               >
                 <X className="w-4 h-4" />
@@ -519,22 +574,143 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         {isTranscribing && (
           <div className="flex items-center gap-2.5 bg-emerald-50 text-emerald-900 border border-emerald-300 rounded-xl px-3.5 py-2 text-xs shadow-xs animate-fadeIn">
             <Loader2 className="w-4 h-4 animate-spin text-emerald-600" />
-            <span className="font-semibold">جارٍ تحويل صوتك بدقة إلى استفسار مكتوب...</span>
+            <span className="font-semibold">جارٍ معالجة سؤالك الصوتي وإرساله للمستشار فوراً للإجابة عليه...</span>
           </div>
         )}
 
         {/* Microphone Error Message if permission denied */}
         {micError && (
-          <div className="flex items-center justify-between bg-amber-50 border border-amber-300 text-amber-950 rounded-xl px-3.5 py-2 text-xs shadow-xs">
-            <span className="leading-relaxed">⚠️ {micError}</span>
-            <button
-              type="button"
-              onClick={() => setMicError(null)}
-              className="text-amber-800 hover:text-amber-950 font-bold p-1 rounded-lg hover:bg-amber-100 cursor-pointer"
-              title="إغلاق التنبيه"
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 bg-amber-50 border border-amber-300 text-amber-950 rounded-2xl p-3 text-xs shadow-xs animate-fadeIn">
+            <div className="flex items-center gap-2">
+              <ShieldAlert className="w-4 h-4 text-amber-700 flex-shrink-0" />
+              <span className="leading-relaxed font-medium">{micError}</span>
+            </div>
+            <div className="flex items-center gap-1.5 self-end sm:self-center flex-shrink-0">
+              <button
+                type="button"
+                onClick={() => setShowMicHelpModal(true)}
+                className="flex items-center gap-1 bg-amber-200 hover:bg-amber-300 text-amber-900 px-2.5 py-1.5 rounded-xl font-bold text-[11px] transition-colors cursor-pointer shadow-2xs"
+                title="شرح فك حظر المايك في خطوتين"
+              >
+                <HelpCircle className="w-3.5 h-3.5" />
+                <span>كيف أفعّله؟</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleToggleRecord}
+                className="flex items-center gap-1 bg-emerald-700 hover:bg-emerald-800 text-white px-3 py-1.5 rounded-xl font-bold text-[11px] transition-colors cursor-pointer shadow-xs active:scale-95"
+                title="إعادة محاولة تشغيل المايك فوراً"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>إعادة التجربة</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setMicError(null)}
+                className="text-amber-800 hover:text-amber-950 p-1.5 rounded-xl hover:bg-amber-100/80 cursor-pointer transition-colors"
+                title="إغلاق التنبيه"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Modal: How to unblock microphone in Chrome/Edge/Windows */}
+        {showMicHelpModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fadeIn">
+            <div 
+              className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 text-right space-y-4 max-h-[90vh] overflow-y-auto"
+              dir="rtl"
             >
-              <X className="w-4 h-4" />
-            </button>
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-10 h-10 rounded-2xl bg-amber-100 flex items-center justify-center text-amber-700">
+                    <Lock className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-slate-800 text-base">طريقة تفعيل المايك في المتصفح</h3>
+                    <p className="text-xs text-slate-500">خطوتان بسيطتان لحل الحظر في 10 ثوانٍ</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowMicHelpModal(false)}
+                  className="p-1.5 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-100 cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="space-y-3.5 text-xs text-slate-700 leading-relaxed">
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-2xl text-amber-950">
+                  <span className="font-bold">⚠️ ملاحظة هامة:</span> التطبيق جاهز تماماً للعمل، ولكن متصفحك (Chrome أو Edge) قام بحظر إذن الصوت لحماية خصوصيتك حتى تسمح له يدوياً.
+                </div>
+
+                <div className="space-y-3">
+                  <div className="flex items-start gap-3 p-3 bg-slate-50 rounded-2xl border border-slate-200">
+                    <span className="flex-shrink-0 w-6 h-6 rounded-full bg-emerald-700 text-white flex items-center justify-center font-bold text-xs">
+                      1
+                    </span>
+                    <div>
+                      <p className="font-bold text-slate-900 mb-1">انقر على أيقونة القفل 🔒 أعلى المتصفح</p>
+                      <p className="text-slate-600">
+                        في شريط العنوان أعلى الشاشة بجوار رابط الموقع <code className="bg-slate-200 px-1 py-0.5 rounded text-[11px] text-slate-800">https://...</code> اضغط على علامة القفل 🔒 أو إعدادات الموقع.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-3 p-3 bg-slate-50 rounded-2xl border border-slate-200">
+                    <span className="flex-shrink-0 w-6 h-6 rounded-full bg-emerald-700 text-white flex items-center justify-center font-bold text-xs">
+                      2
+                    </span>
+                    <div>
+                      <p className="font-bold text-slate-900 mb-1">حوّل الميكروفون إلى "سماح" (Allow)</p>
+                      <p className="text-slate-600">
+                        ستجد خيار <span className="font-semibold text-emerald-800">الميكروفون (Microphone)</span>، غيّر حالته من <span className="font-semibold text-rose-600">حظر (Block)</span> إلى <span className="font-semibold text-emerald-700">سماح (Allow)</span>.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-3 p-3 bg-emerald-50 rounded-2xl border border-emerald-200">
+                    <span className="flex-shrink-0 w-6 h-6 rounded-full bg-emerald-600 text-white flex items-center justify-center font-bold text-xs">
+                      3
+                    </span>
+                    <div>
+                      <p className="font-bold text-emerald-950 mb-1">اضغط على زر "جرّب المايك الآن"</p>
+                      <p className="text-emerald-800">
+                        بمجرد تفعيل الإذن، اضغط الزر الأخضر بالأسفل وسيبدأ المايك بالتقاط صوتك على الفور!
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-3 bg-blue-50 border border-blue-200 rounded-2xl text-[11px] text-blue-900">
+                  <span className="font-bold">💻 لمستخدمي ويندوز:</span> إذا استمر الحظر، تأكد من فتح إعدادات Windows (Settings ⚙️) ثم (Privacy & Security &gt; Microphone) والتأكد من تفعيل <span className="font-semibold">"Let desktop apps access your microphone"</span>.
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setShowMicHelpModal(false)}
+                  className="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 font-semibold text-xs cursor-pointer"
+                >
+                  إغلاق
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowMicHelpModal(false);
+                    startRecording();
+                  }}
+                  className="flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs shadow-md transition-all active:scale-95 cursor-pointer"
+                >
+                  <Mic className="w-4 h-4" />
+                  <span>جرّب المايك الآن</span>
+                </button>
+              </div>
+            </div>
           </div>
         )}
 
