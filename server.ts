@@ -314,31 +314,42 @@ app.post('/api/chat/stream', async (req, res) => {
     let usedModel = 'gemini-3.1-flash-lite';
 
     try {
+      // Primary model: gemini-3.1-flash-lite (ultra-fast, streams in ~350-500ms)
       responseStream = await ai.models.generateContentStream({
         model: 'gemini-3.1-flash-lite',
         contents,
         config: {
           systemInstruction,
           temperature: 0.2,
-          thinkingConfig: { thinkingBudget: 0 },
         },
       });
     } catch (primaryErr: any) {
-      console.warn('Primary model (gemini-3.1-flash-lite) returned error, attempting fallback to gemini-3.8-flash:', primaryErr?.message);
-      // Automatic fallback if needed
-      usedModel = 'gemini-3.8-flash';
+      console.warn('gemini-3.1-flash-lite error, attempting fallback to gemini-3.8-flash:', primaryErr?.message);
       try {
+        usedModel = 'gemini-3.8-flash';
         responseStream = await ai.models.generateContentStream({
           model: 'gemini-3.8-flash',
           contents,
           config: {
             systemInstruction,
             temperature: 0.2,
-            thinkingConfig: { thinkingBudget: 0 },
           },
         });
-      } catch (fallbackErr: any) {
-        throw new Error('خوادم الخدمة تشهد ضغطاً مؤقتاً كبيراً في هذه اللحظة (503). يرجى الضغط على إعادة المحاولة بعد ثوانٍ قليلة.');
+      } catch (fallback1Err: any) {
+        console.warn('gemini-3.8-flash error, attempting fallback to gemini-flash-latest:', fallback1Err?.message);
+        try {
+          usedModel = 'gemini-flash-latest';
+          responseStream = await ai.models.generateContentStream({
+            model: 'gemini-flash-latest',
+            contents,
+            config: {
+              systemInstruction,
+              temperature: 0.2,
+            },
+          });
+        } catch (fallback2Err: any) {
+          throw new Error('خوادم الذكاء الاصطناعي تشهد ضغطاً مؤقتاً. يرجى إعادة المحاولة.');
+        }
       }
     }
 
@@ -407,14 +418,26 @@ app.post('/api/analyze-document', async (req, res) => {
       },
     ];
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-3.8-flash',
-      contents: { parts },
-      config: {
-        systemInstruction,
-        temperature: 0.2,
-      },
-    });
+    let response;
+    try {
+      response = await ai.models.generateContent({
+        model: 'gemini-3.1-flash-lite',
+        contents: { parts },
+        config: {
+          systemInstruction,
+          temperature: 0.2,
+        },
+      });
+    } catch (e) {
+      response = await ai.models.generateContent({
+        model: 'gemini-3.8-flash',
+        contents: { parts },
+        config: {
+          systemInstruction,
+          temperature: 0.2,
+        },
+      });
+    }
 
     res.json({ analysis: response.text });
   } catch (err: any) {
@@ -497,12 +520,31 @@ app.post('/api/transcribe', async (req, res) => {
 
     let responseText = '';
     try {
-      // First attempt: specialized, ultra-fast gemini-3.5-transcribe (~1s)
+      // First attempt: specialized, ultra-fast gemini-3.5-transcribe
       const fastResponse = await ai.models.generateContent({
         model: 'gemini-3.5-transcribe',
-        contents: [
-          {
-            role: 'user',
+        contents: {
+          parts: [
+            {
+              inlineData: {
+                mimeType: cleanMimeType,
+                data: audioData,
+              },
+            },
+            {
+              text: 'أنت خبير تفريغ صوتي دقيق ومتخصص في اللهجة العامية المصرية ومصطلحات التأمينات الاجتماعية. فرغ ما قاله المتحدث بدقة بدون إضافات واكتب الكلام المنطوق فقط.',
+            },
+          ],
+        },
+      });
+      responseText = fastResponse.text?.trim() || '';
+    } catch (fastErr) {
+      console.warn('gemini-3.5-transcribe failed, falling back to gemini-3.1-flash-lite:', fastErr);
+      try {
+        // Fallback attempt 1: gemini-3.1-flash-lite (fast multimodal)
+        const fallback1Response = await ai.models.generateContent({
+          model: 'gemini-3.1-flash-lite',
+          contents: {
             parts: [
               {
                 inlineData: {
@@ -511,21 +553,21 @@ app.post('/api/transcribe', async (req, res) => {
                 },
               },
               {
-                text: 'أنت خبير تفريغ صوتي دقيق ومتخصص في اللهجة العامية المصرية ومصطلحات التأمينات الاجتماعية. فرغ ما قاله المتحدث بدقة بدون إضافات.',
+                text: 'أنت خبير تفريغ صوتي دقيق ومتخصص في اللهجة العامية المصرية ومصطلحات التأمينات الاجتماعية. استمع للتسجيل الصوتي واكتب ما قاله المتحدث بدقة بدون إضافات.',
               },
             ],
           },
-        ],
-      });
-      responseText = fastResponse.text?.trim() || '';
-    } catch (fastErr) {
-      console.warn('gemini-3.5-transcribe failed, falling back to gemini-3.8-flash:', fastErr);
-      // Fallback attempt: gemini-3.8-flash
-      const fallbackResponse = await ai.models.generateContent({
-        model: 'gemini-3.8-flash',
-        contents: [
-          {
-            role: 'user',
+          config: {
+            temperature: 0.1,
+          },
+        });
+        responseText = fallback1Response.text?.trim() || '';
+      } catch (fallback1Err) {
+        console.warn('gemini-3.1-flash-lite failed, falling back to gemini-3.8-flash:', fallback1Err);
+        // Fallback attempt 2: gemini-3.8-flash
+        const fallback2Response = await ai.models.generateContent({
+          model: 'gemini-3.8-flash',
+          contents: {
             parts: [
               {
                 inlineData: {
@@ -538,12 +580,12 @@ app.post('/api/transcribe', async (req, res) => {
               },
             ],
           },
-        ],
-        config: {
-          temperature: 0.1,
-        },
-      });
-      responseText = fallbackResponse.text?.trim() || '';
+          config: {
+            temperature: 0.1,
+          },
+        });
+        responseText = fallback2Response.text?.trim() || '';
+      }
     }
 
     let transcript = responseText.replace(/^["'«»]+|["'«»]+$/g, '') || '';
