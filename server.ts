@@ -495,30 +495,58 @@ app.post('/api/transcribe', async (req, res) => {
       cleanMimeType = 'audio/webm';
     }
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-3.8-flash',
-      contents: [
-        {
-          role: 'user',
-          parts: [
-            {
-              inlineData: {
-                mimeType: cleanMimeType,
-                data: audioData,
+    let responseText = '';
+    try {
+      // First attempt: specialized, ultra-fast gemini-3.5-transcribe (~1s)
+      const fastResponse = await ai.models.generateContent({
+        model: 'gemini-3.5-transcribe',
+        contents: [
+          {
+            role: 'user',
+            parts: [
+              {
+                inlineData: {
+                  mimeType: cleanMimeType,
+                  data: audioData,
+                },
               },
-            },
-            {
-              text: 'أنت خبير تفريغ صوتي دقيق ومتخصص في اللهجة العامية المصرية والمصطلحات التأمينية وقانون التأمينات رقم 148 لسنة 2019. استمع للتسجيل الصوتي بدقة واكتب بالضبط ما قاله المتحدث بلهجته بدون أي مقدمات أو شروحات أو أقواس أو علامات تنصيص إضافية.',
-            },
-          ],
+              {
+                text: 'أنت خبير تفريغ صوتي دقيق ومتخصص في اللهجة العامية المصرية ومصطلحات التأمينات الاجتماعية. فرغ ما قاله المتحدث بدقة بدون إضافات.',
+              },
+            ],
+          },
+        ],
+      });
+      responseText = fastResponse.text?.trim() || '';
+    } catch (fastErr) {
+      console.warn('gemini-3.5-transcribe failed, falling back to gemini-3.8-flash:', fastErr);
+      // Fallback attempt: gemini-3.8-flash
+      const fallbackResponse = await ai.models.generateContent({
+        model: 'gemini-3.8-flash',
+        contents: [
+          {
+            role: 'user',
+            parts: [
+              {
+                inlineData: {
+                  mimeType: cleanMimeType,
+                  data: audioData,
+                },
+              },
+              {
+                text: 'أنت خبير تفريغ صوتي دقيق ومتخصص في اللهجة العامية المصرية والمصطلحات التأمينية. استمع للتسجيل الصوتي واكتب ما قاله المتحدث بدون إضافات.',
+              },
+            ],
+          },
+        ],
+        config: {
+          temperature: 0.1,
         },
-      ],
-      config: {
-        temperature: 0.1,
-      },
-    });
+      });
+      responseText = fallbackResponse.text?.trim() || '';
+    }
 
-    let transcript = response.text?.trim().replace(/^["'«»]+|["'«»]+$/g, '') || '';
+    let transcript = responseText.replace(/^["'«»]+|["'«»]+$/g, '') || '';
     if (/^(silence|صمت|لا يوجد صوت|بدون صوت)[\.\s]*$/i.test(transcript)) {
       transcript = '';
     }
