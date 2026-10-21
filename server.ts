@@ -519,10 +519,11 @@ app.post('/api/transcribe', async (req, res) => {
     }
 
     let responseText = '';
+
+    // Primary: gemini-3.8-flash with high accuracy for Egyptian Arabic audio
     try {
-      // First attempt: specialized, ultra-fast gemini-3.5-transcribe
-      const fastResponse = await ai.models.generateContent({
-        model: 'gemini-3.5-transcribe',
+      const response1 = await ai.models.generateContent({
+        model: 'gemini-3.8-flash',
         contents: {
           parts: [
             {
@@ -532,17 +533,23 @@ app.post('/api/transcribe', async (req, res) => {
               },
             },
             {
-              text: 'أنت خبير تفريغ صوتي دقيق ومتخصص في اللهجة العامية المصرية ومصطلحات التأمينات الاجتماعية. فرغ ما قاله المتحدث بدقة بدون إضافات واكتب الكلام المنطوق فقط.',
+              text: 'أنت خبير تفريغ صوتي متخصص في اللهجة العامية المصرية ومصطلحات التأمينات والمعاشات. استمع للمقطع الصوتي واكتب الكلام المنطوق فقط بدون أي مقدمات أو علامات إضافية.',
             },
           ],
         },
+        config: {
+          temperature: 0.1,
+        },
       });
-      responseText = fastResponse.text?.trim() || '';
-    } catch (fastErr) {
-      console.warn('gemini-3.5-transcribe failed, falling back to gemini-3.1-flash-lite:', fastErr);
+      responseText = response1.text?.trim() || '';
+    } catch (err1) {
+      console.warn('gemini-3.8-flash transcribe error, trying gemini-3.1-flash-lite:', err1);
+    }
+
+    // Fallback if empty or failed: gemini-3.1-flash-lite
+    if (!responseText) {
       try {
-        // Fallback attempt 1: gemini-3.1-flash-lite (fast multimodal)
-        const fallback1Response = await ai.models.generateContent({
+        const response2 = await ai.models.generateContent({
           model: 'gemini-3.1-flash-lite',
           contents: {
             parts: [
@@ -553,7 +560,7 @@ app.post('/api/transcribe', async (req, res) => {
                 },
               },
               {
-                text: 'أنت خبير تفريغ صوتي دقيق ومتخصص في اللهجة العامية المصرية ومصطلحات التأمينات الاجتماعية. استمع للتسجيل الصوتي واكتب ما قاله المتحدث بدقة بدون إضافات.',
+                text: 'استمع للمقطع الصوتي واكتب نص الكلمات المنطوقة باللغة العربية العامية المصرية بدقة.',
               },
             ],
           },
@@ -561,30 +568,9 @@ app.post('/api/transcribe', async (req, res) => {
             temperature: 0.1,
           },
         });
-        responseText = fallback1Response.text?.trim() || '';
-      } catch (fallback1Err) {
-        console.warn('gemini-3.1-flash-lite failed, falling back to gemini-3.8-flash:', fallback1Err);
-        // Fallback attempt 2: gemini-3.8-flash
-        const fallback2Response = await ai.models.generateContent({
-          model: 'gemini-3.8-flash',
-          contents: {
-            parts: [
-              {
-                inlineData: {
-                  mimeType: cleanMimeType,
-                  data: audioData,
-                },
-              },
-              {
-                text: 'أنت خبير تفريغ صوتي دقيق ومتخصص في اللهجة العامية المصرية والمصطلحات التأمينية. استمع للتسجيل الصوتي واكتب ما قاله المتحدث بدون إضافات.',
-              },
-            ],
-          },
-          config: {
-            temperature: 0.1,
-          },
-        });
-        responseText = fallback2Response.text?.trim() || '';
+        responseText = response2.text?.trim() || '';
+      } catch (err2) {
+        console.warn('gemini-3.1-flash-lite fallback error:', err2);
       }
     }
 

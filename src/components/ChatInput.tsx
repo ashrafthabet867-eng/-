@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { Send, Mic, MicOff, X, Paperclip, Loader2, Check, Lock, RotateCcw, HelpCircle, ShieldAlert, CheckCircle2 } from 'lucide-react';
+import { Send, Mic, MicOff, X, Paperclip, Loader2, Check, Lock, RotateCcw, HelpCircle, ShieldAlert, CheckCircle2, ExternalLink } from 'lucide-react';
 import { ResponseMode } from '../types';
 
 interface ChatInputProps {
@@ -280,7 +280,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                 type: chosenMimeType || 'audio/webm',
               });
 
-              if (audioBlob.size > 300) {
+              if (audioBlob.size > 50) {
                 const reader = new FileReader();
                 reader.onloadend = async () => {
                   const base64Data = (reader.result as string)?.split(',')[1];
@@ -342,7 +342,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           }
         };
 
-        mediaRecorder.start(100);
+        mediaRecorder.start(250);
         mediaRecorderRef.current = mediaRecorder;
       } catch (mrErr) {
         console.warn('Failed to start MediaRecorder:', mrErr);
@@ -417,9 +417,6 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       try {
-        if (typeof mediaRecorderRef.current.requestData === 'function') {
-          mediaRecorderRef.current.requestData();
-        }
         mediaRecorderRef.current.stop();
       } catch (e) {}
       mediaRecorderRef.current = null;
@@ -604,15 +601,26 @@ export const ChatInput: React.FC<ChatInputProps> = ({
               <ShieldAlert className="w-4 h-4 text-amber-700 flex-shrink-0" />
               <span className="leading-relaxed font-medium">{micError}</span>
             </div>
-            <div className="flex items-center gap-1.5 self-end sm:self-center flex-shrink-0">
+            <div className="flex items-center gap-1.5 self-end sm:self-center flex-shrink-0 flex-wrap">
+              {typeof window !== 'undefined' && window.self !== window.top && (
+                <button
+                  type="button"
+                  onClick={() => window.open(window.location.href, '_blank')}
+                  className="flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white px-2.5 py-1.5 rounded-xl font-bold text-[11px] transition-colors cursor-pointer shadow-2xs"
+                  title="فتح في نافذة متصفح مستقلة لتجاوز قيود الإطار المدمج"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  <span>فتح بالمتصفح</span>
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => setShowMicHelpModal(true)}
                 className="flex items-center gap-1 bg-amber-200 hover:bg-amber-300 text-amber-900 px-2.5 py-1.5 rounded-xl font-bold text-[11px] transition-colors cursor-pointer shadow-2xs"
-                title="شرح فك حظر المايك في خطوتين"
+                title="شرح فك حظر المايك بالهاتف والكمبيوتر"
               >
                 <HelpCircle className="w-3.5 h-3.5" />
-                <span>كيف أفعّله؟</span>
+                <span>طريقة التفعيل</span>
               </button>
               <button
                 type="button"
@@ -635,7 +643,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           </div>
         )}
 
-        {/* Modal: How to unblock microphone in Chrome/Edge/Windows */}
+        {/* Modal: How to unblock microphone in Chrome/Edge/Android/iPhone */}
         {showMicHelpModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fadeIn">
             <div 
@@ -648,8 +656,8 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                     <Lock className="w-5 h-5" />
                   </div>
                   <div>
-                    <h3 className="font-bold text-slate-800 text-base">طريقة تفعيل المايك في المتصفح</h3>
-                    <p className="text-xs text-slate-500">خطوتان بسيطتان لحل الحظر في 10 ثوانٍ</p>
+                    <h3 className="font-bold text-slate-800 text-base">طريقة تفعيل المايك في الهاتف والمتصفح</h3>
+                    <p className="text-xs text-slate-500">حل بسيط وسريع في ثوانٍ معدودة</p>
                   </div>
                 </div>
                 <button
@@ -663,50 +671,51 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 
               <div className="space-y-3.5 text-xs text-slate-700 leading-relaxed">
                 <div className="p-3 bg-amber-50 border border-amber-200 rounded-2xl text-amber-950">
-                  <span className="font-bold">⚠️ ملاحظة هامة:</span> التطبيق جاهز تماماً للعمل، ولكن متصفحك (Chrome أو Edge) قام بحظر إذن الصوت لحماية خصوصيتك حتى تسمح له يدوياً.
+                  <span className="font-bold">⚠️ تنبيه:</span> المتصفح أو نظام الهاتف يتطلب منح إذن الميكروفون مرة واحدة لحماية خصوصيتك.
                 </div>
 
-                <div className="space-y-3">
-                  <div className="flex items-start gap-3 p-3 bg-slate-50 rounded-2xl border border-slate-200">
-                    <span className="flex-shrink-0 w-6 h-6 rounded-full bg-emerald-700 text-white flex items-center justify-center font-bold text-xs">
-                      1
-                    </span>
-                    <div>
-                      <p className="font-bold text-slate-900 mb-1">انقر على أيقونة القفل 🔒 أعلى المتصفح</p>
-                      <p className="text-slate-600">
-                        في شريط العنوان أعلى الشاشة بجوار رابط الموقع <code className="bg-slate-200 px-1 py-0.5 rounded text-[11px] text-slate-800">https://...</code> اضغط على علامة القفل 🔒 أو إعدادات الموقع.
-                      </p>
-                    </div>
+                <div className="space-y-2.5">
+                  <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200 space-y-1">
+                    <p className="font-bold text-slate-900 flex items-center gap-1.5">
+                      <span>📱 على هواتف أندرويد (Google Chrome):</span>
+                    </p>
+                    <p className="text-slate-600 text-[11px]">
+                      انقر على أيقونة <strong>القفل 🔒 أو إعدادات الموقع</strong> بجوار رابط الموقع أعلى الشاشة، ثم اضغط على <strong>الأذونات (Permissions)</strong> وحوّل الميكروفون إلى <strong>سماح (Allow)</strong>.
+                    </p>
                   </div>
 
-                  <div className="flex items-start gap-3 p-3 bg-slate-50 rounded-2xl border border-slate-200">
-                    <span className="flex-shrink-0 w-6 h-6 rounded-full bg-emerald-700 text-white flex items-center justify-center font-bold text-xs">
-                      2
-                    </span>
-                    <div>
-                      <p className="font-bold text-slate-900 mb-1">حوّل الميكروفون إلى "سماح" (Allow)</p>
-                      <p className="text-slate-600">
-                        ستجد خيار <span className="font-semibold text-emerald-800">الميكروفون (Microphone)</span>، غيّر حالته من <span className="font-semibold text-rose-600">حظر (Block)</span> إلى <span className="font-semibold text-emerald-700">سماح (Allow)</span>.
-                      </p>
-                    </div>
+                  <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200 space-y-1">
+                    <p className="font-bold text-slate-900 flex items-center gap-1.5">
+                      <span>🍏 على هواتف آيفون (Safari):</span>
+                    </p>
+                    <p className="text-slate-600 text-[11px]">
+                      اضغط على رمز <strong>aA</strong> في شريط الرابط بالأسفل &gt; <strong>إعدادات موقع الويب (Website Settings)</strong> &gt; <strong>الميكروفون</strong> &gt; اختر <strong>السماح (Allow)</strong>.
+                    </p>
                   </div>
 
-                  <div className="flex items-start gap-3 p-3 bg-emerald-50 rounded-2xl border border-emerald-200">
-                    <span className="flex-shrink-0 w-6 h-6 rounded-full bg-emerald-600 text-white flex items-center justify-center font-bold text-xs">
-                      3
-                    </span>
-                    <div>
-                      <p className="font-bold text-emerald-950 mb-1">اضغط على زر "جرّب المايك الآن"</p>
-                      <p className="text-emerald-800">
-                        بمجرد تفعيل الإذن، اضغط الزر الأخضر بالأسفل وسيبدأ المايك بالتقاط صوتك على الفور!
-                      </p>
-                    </div>
+                  <div className="p-3 bg-emerald-50 rounded-2xl border border-emerald-200 space-y-1">
+                    <p className="font-bold text-emerald-950 flex items-center gap-1.5">
+                      <span>💡 حل فوري وسريع 100% على أي هاتف:</span>
+                    </p>
+                    <p className="text-emerald-900 text-[11px]">
+                      يمكنك الضغط داخل مربع الكتابة واستخدام <strong>علامة المايكروفون 🎙️ المدمجة في لوحة مفاتيح هاتفك (Gboard أو كيبورد الآيفون)</strong> للتحدث بالعامية وسيقوم الهاتف بكتابة كلامك فوراً وإرساله بنقرة واحدة!
+                    </p>
                   </div>
                 </div>
 
-                <div className="p-3 bg-blue-50 border border-blue-200 rounded-2xl text-[11px] text-blue-900">
-                  <span className="font-bold">💻 لمستخدمي ويندوز:</span> إذا استمر الحظر، تأكد من فتح إعدادات Windows (Settings ⚙️) ثم (Privacy & Security &gt; Microphone) والتأكد من تفعيل <span className="font-semibold">"Let desktop apps access your microphone"</span>.
-                </div>
+                {typeof window !== 'undefined' && window.self !== window.top && (
+                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-2xl text-[11px] text-blue-900 flex items-center justify-between gap-2">
+                    <span>إذا كنت تفتح التطبيق داخل نافذة مدمجة، افتحه بمتصفح خارجي:</span>
+                    <button
+                      type="button"
+                      onClick={() => window.open(window.location.href, '_blank')}
+                      className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl flex items-center gap-1 flex-shrink-0 cursor-pointer shadow-xs"
+                    >
+                      <span>فتح بـ Chrome</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </button>
+                  </div>
+                )}
               </div>
 
               <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
@@ -829,6 +838,25 @@ export const ChatInput: React.FC<ChatInputProps> = ({
               <Send className="w-4 h-4 sm:w-5 sm:h-5 rotate-180" />
             )}
           </button>
+        </div>
+
+        {/* Mobile-friendly voice hints */}
+        <div className="flex flex-wrap items-center justify-between text-[11px] text-slate-500 px-1 pt-0.5 gap-1.5">
+          <span className="flex items-center gap-1.5">
+            <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0"></span>
+            <span>تحدث بالعامية المصرية بحرية.. أو استخدم مايك كيبورد هاتفك (Gboard / آيفون)</span>
+          </span>
+          {typeof window !== 'undefined' && window.self !== window.top && (
+            <button
+              type="button"
+              onClick={() => window.open(window.location.href, '_blank')}
+              className="text-emerald-700 hover:text-emerald-800 font-semibold inline-flex items-center gap-1 underline underline-offset-2 cursor-pointer flex-shrink-0"
+              title="فتح التطبيق في متصفح خارجي لتجاوز قيود الإطارات المدمجة"
+            >
+              <span>فتح كنافذة كاملة</span>
+              <ExternalLink className="w-3 h-3" />
+            </button>
+          )}
         </div>
       </div>
     </div>
