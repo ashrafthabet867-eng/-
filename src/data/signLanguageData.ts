@@ -28,7 +28,7 @@ export const EGYPTIAN_SIGN_TERMS: SignTerm[] = [
     handMovement: 'اليد اليمنى تُشير للزمن (معصم اليد اليسرى) ثم حركة قطع أفقية تعني التوقف عن العمل قبل الأوان.',
     facialExpression: 'ملامح تأكيد وهدوء مع إيماءة الرأس للأسفل.',
     visualIcon: '⏳',
-    videoThumbnail: '/assets/sign_language_interpreter.jpg',
+    videoThumbnail: '/assets/sign_early_retire.jpg',
     summary: 'طلب الخروج على المعاش قبل بلوغ سن الستين بشرط 25 سنة اشتراك فعلي.',
     steps: [
       '1. إشارة "العمل": كفان متقابلان بحركة طرق متبادلة.',
@@ -47,7 +47,7 @@ export const EGYPTIAN_SIGN_TERMS: SignTerm[] = [
     handMovement: 'اليد اليمنى تلمس الذقن ثم ترتفع لأعلى في خط مائل مع الإشارة إلى رقم 60 ثم 65.',
     facialExpression: 'ملامح وقار واحترام مع ابتسامة خفيفة.',
     visualIcon: '🧓',
-    videoThumbnail: '/assets/sign_language_interpreter.jpg',
+    videoThumbnail: '/assets/sign_pension_age.jpg',
     summary: 'بلوغ السن النظامي للتقاعد والحصول على المعاش الكامل (60 سنة ترتفع حتى 65).',
     steps: [
       '1. إشارة "السن": السبابة تلمس الذقن بحركة دائرية.',
@@ -65,7 +65,7 @@ export const EGYPTIAN_SIGN_TERMS: SignTerm[] = [
     handMovement: 'رسم مستطيل بالسبابتين، ثم إشارة الرقم (6) باليد، ثم حركة كف اليد من الداخل للخارج (خروج).',
     facialExpression: 'ملامح جدية وحزم للتأكيد على أهمية المستند.',
     visualIcon: '📄',
-    videoThumbnail: '/assets/sign_language_interpreter.jpg',
+    videoThumbnail: '/assets/sign_form6.jpg',
     summary: 'النموذج الرسمي المعتمد الذي يقدمه صاحب العمل لإثبات نهاية خدمة الموظف.',
     steps: [
       '1. إشارة "مستند رسمي": رسم مستطيل بالأصابع في الهواء.',
@@ -84,7 +84,7 @@ export const EGYPTIAN_SIGN_TERMS: SignTerm[] = [
     handMovement: 'حركة نقر بالأصابع كالكتابة على الحاسب ثم سحب اليدين رأسياً كإخراج شريط ورقي مطبوع.',
     facialExpression: 'تركيز ومتابعة بالعينين لحركة سحب الورقة.',
     visualIcon: '🪪',
-    videoThumbnail: '/assets/sign_language_interpreter.jpg',
+    videoThumbnail: '/assets/sign_insurance_printout.jpg',
     summary: 'بيان معتمد بختم النسر يوضح الرقم التأميني وتاريخ بدء ونهاية كافة مدد العمل.',
     steps: [
       '1. إشارة "كمبيوتر": حركة نقر سريعة بأصابع اليدين.',
@@ -103,7 +103,7 @@ export const EGYPTIAN_SIGN_TERMS: SignTerm[] = [
     handMovement: 'خفض اليدين للأسفل بخشوع، ثم حركة توزيع مروحة بالكفين للإشارة لتوزيع الحصص على الأسرة.',
     facialExpression: 'ملامح مواساة وتعاطف ورجاء بالرحمة.',
     visualIcon: '🕊️',
-    videoThumbnail: '/assets/sign_language_interpreter.jpg',
+    videoThumbnail: '/assets/sign_death_survivor.jpg',
     summary: 'انتقال المعاش للمستحقين عن المؤمن عليه المتوفى (أرملة، أبناء، بنات، والدين، إخوة).',
     steps: [
       '1. إشارة "المواساة": لمس الصدر برفق وإيماءة مواساة.',
@@ -122,7 +122,7 @@ export const EGYPTIAN_SIGN_TERMS: SignTerm[] = [
     handMovement: 'لمس إصبع البنصر الأيسر بالإبهام والسبابة الأيمن، ثم حركة بسط الكفين لأعلى بمباركة وسعادة.',
     facialExpression: 'ابتسامة واسعة واضحة مع إيماءة التهنئة والمباركة.',
     visualIcon: '💍',
-    videoThumbnail: '/assets/sign_language_interpreter.jpg',
+    videoThumbnail: '/assets/sign_marriage_grant.jpg',
     summary: 'منحة مالية تعادل معاش سنة كاملة (12 شهراً) تصرف لمرة واحدة عند زواج الابنة أو الأخت.',
     steps: [
       '1. إشارة "المباركة والفرح": فتح الكفين ورفعهما مع ابتسامة.',
@@ -141,7 +141,7 @@ export const EGYPTIAN_SIGN_TERMS: SignTerm[] = [
     handMovement: 'ضربة خفيفة بالكف على الساعد الآخر مع الإشارة بسماعة الطبيب على الصدر.',
     facialExpression: 'ملامح احتراز وتعاطف واهتمام بالصحة.',
     visualIcon: '🩹',
-    videoThumbnail: '/assets/sign_language_interpreter.jpg',
+    videoThumbnail: '/assets/sign_insurance_printout.jpg',
     summary: 'حماية الموظف في حالة وقوع حادث بالعمل أو أثناء الذهاب والعودة، مع تعويض كامل.',
     steps: [
       '1. إشارة "الإصابة": لمس الساعد أو الذراع مع التعبير عن الألم.',
@@ -160,7 +160,7 @@ export const EGYPTIAN_SIGN_TERMS: SignTerm[] = [
     handMovement: 'حركة اليدين بالتناوب للعمل الحر، ثم الإشارة لرقم (9) مع حركة دفع جزء بسيط والدولة تتكفل بالباقي.',
     facialExpression: 'ملامح تشجيع ودعم وأمان اجتماعي.',
     visualIcon: '👷',
-    videoThumbnail: '/assets/sign_language_interpreter.jpg',
+    videoThumbnail: '/assets/sign_early_retire.jpg',
     summary: 'تأمين شامل للعمال باليومية والحرفيين، يدفع المواطن 9% فقط والدولة تتحمل 12%.',
     steps: [
       '1. إشارة "العمل الحر": حركة اليدين المتنوعة كالبناء أو الصيد.',
@@ -183,6 +183,7 @@ export interface VisualSignSequenceItem {
   highlightWords: string[];
   visualIcon: string;
   badgeText: string;
+  diagramImage: string; // Specific dynamic gesture diagram for this topic/step
   legalArticle?: string;
 }
 
@@ -205,6 +206,7 @@ export function generateSignSequenceFromText(botResponse: string): VisualSignSeq
     highlightWords: ['أهلاً بك', 'التأمين الاجتماعي', 'تحت أمرك'],
     visualIcon: '🏛️',
     badgeText: 'تحية رسمية',
+    diagramImage: '/assets/sign_language_interpreter.jpg',
     legalArticle: 'قانون 148 لسنة 2019',
   });
 
@@ -221,12 +223,13 @@ export function generateSignSequenceFromText(botResponse: string): VisualSignSeq
       highlightWords: ['25 سنة', '300 شهر', 'اشتراك فعلي', '50% من الأجر'],
       visualIcon: '⏳',
       badgeText: 'المعاش المبكر',
+      diagramImage: '/assets/sign_early_retire.jpg',
       legalArticle: 'المادة 21 بند 6',
     });
   }
 
   // 3. فحص سن المعاش وتدرج التقاعد
-  if (lower.includes('سن') || lower.includes('شيخوخة') || lower.includes('60') || lower.includes('65') || lower.includes('2032')) {
+  if (lower.includes('سن') || lower.includes('شيخوخة') || lower.includes('60') || lower.includes('65') || lower.includes('2032') || lower.includes('معاش')) {
     sequence.push({
       id: 'pension_age_sign',
       title: 'إشارة: سن التقاعد وتدرج رفع السن حتى 65',
@@ -238,12 +241,13 @@ export function generateSignSequenceFromText(botResponse: string): VisualSignSeq
       highlightWords: ['سن 60', 'سن 65', 'تدرج السن', 'يوليو 2032'],
       visualIcon: '🧓',
       badgeText: 'سن التقاعد',
+      diagramImage: '/assets/sign_pension_age.jpg',
       legalArticle: 'المادة 41',
     });
   }
 
   // 4. استمارة 6 وإنهاء الخدمة
-  if (lower.includes('استمارة 6') || lower.includes('س6') || lower.includes('استقالة') || lower.includes('إنهاء خدمة')) {
+  if (lower.includes('استمارة 6') || lower.includes('س6') || lower.includes('استقالة') || lower.includes('إنهاء خدمة') || lower.includes('فصل') || lower.includes('ترك العمل')) {
     sequence.push({
       id: 'form6_sign',
       title: 'إشارة: استمارة (6) تأمينات (إنهاء الخدمة)',
@@ -255,12 +259,13 @@ export function generateSignSequenceFromText(botResponse: string): VisualSignSeq
       highlightWords: ['استمارة 6', 'استقالة', 'ختم النسر', 'إنهاء الخدمة'],
       visualIcon: '📄',
       badgeText: 'استمارة 6',
+      diagramImage: '/assets/sign_form6.jpg',
       legalArticle: 'اللائحة 2437',
     });
   }
 
   // 5. وفاة المؤمن عليه ومعاش الورثة
-  if (lower.includes('وفاة') || lower.includes('ورثة') || lower.includes('أرملة') || lower.includes('مستحق')) {
+  if (lower.includes('وفاة') || lower.includes('ورثة') || lower.includes('أرملة') || lower.includes('مستحق') || lower.includes('أيتام') || lower.includes('والدين')) {
     sequence.push({
       id: 'survivor_sign',
       title: 'إشارة: حقوق الورثة والمستحقين بعد الوفاة',
@@ -272,12 +277,13 @@ export function generateSignSequenceFromText(botResponse: string): VisualSignSeq
       highlightWords: ['أرملة', 'أبناء', 'توزيع الأنصبة', 'جدول 7', 'منحة وفاة'],
       visualIcon: '🕊️',
       badgeText: 'معاش الورثة',
+      diagramImage: '/assets/sign_death_survivor.jpg',
       legalArticle: 'المادة 98 وجدول 7',
     });
   }
 
   // 6. منحة الزواج
-  if (lower.includes('زواج') || lower.includes('منحة زواج') || lower.includes('عقد قران')) {
+  if (lower.includes('زواج') || lower.includes('منحة زواج') || lower.includes('عقد قران') || lower.includes('عروس') || lower.includes('بنت') || lower.includes('ابنة')) {
     sequence.push({
       id: 'marriage_sign',
       title: 'إشارة: منحة زواج الابنة أو الأخت',
@@ -289,24 +295,44 @@ export function generateSignSequenceFromText(botResponse: string): VisualSignSeq
       highlightWords: ['معاش 12 شهر', 'منحة زواج', 'قسيمة زواج', 'سقوط بالتقادم 5 سنين'],
       visualIcon: '💍',
       badgeText: 'منحة الزواج',
+      diagramImage: '/assets/sign_marriage_grant.jpg',
       legalArticle: 'المادة 105',
     });
   }
 
-  // 7. المستندات والأوراق المطلوبة
-  if (lower.includes('أوراق') || lower.includes('مستندات') || lower.includes('بطاقة') || lower.includes('شهادة')) {
+  // 7. المستندات والبرنت التأميني
+  if (lower.includes('برنت') || lower.includes('رقم تأميني') || lower.includes('أوراق') || lower.includes('مستندات') || lower.includes('بطاقة') || lower.includes('شهادة') || lower.includes('سجل')) {
     sequence.push({
       id: 'docs_sign',
-      title: 'إشارة: الأوراق الرسمية والملف التأميني',
-      signDescription: 'رسم بطاقة الرقم القومي ثم ضرب الكف بالقبضة للدلالة على ختم النسر الرسمي.',
+      title: 'إشارة: البرنت التأميني والأوراق الرسمية',
+      signDescription: 'حركة نقر على لوحة المفاتيح ثم سحب شريط ورقي مطبوع والإشارة للرقم القومي وختم النسر.',
       handMovement: 'رسم مستطيل البطاقة بالسبابة، ثم ضرب الكف المفتوح بقبضة اليد كختم رسمي معتمد.',
-      facialExpression: 'نظرة تأكيد على ضرورة إحضار الأصول والصور والأختام.',
-      keyNotice: 'تأكد من إحضار أصل وصورة بطاقة الرقم القومي سارية والمستندات بختم النسر.',
+      facialExpression: 'نظرة تأكيد على ضرورة إحضار الأصول والصور والأختام الرسمية.',
+      keyNotice: 'البرنت التأميني مستند معتمد بختم النسر يوضح كامل مدد اشتراكك التأمينية.',
       durationSeconds: 5,
-      highlightWords: ['بطاقة الرقم القومي', 'ختم النسر', 'شهادة مميكنة', 'أصل وصورة'],
+      highlightWords: ['برنت تأميني', 'رقم تأميني', 'ختم النسر', 'أصل وصورة'],
       visualIcon: '📁',
-      badgeText: 'الأوراق الرسمية',
-      legalArticle: 'إجراءات الهيئة',
+      badgeText: 'المستندات والبرنت',
+      diagramImage: '/assets/sign_insurance_printout.jpg',
+      legalArticle: 'اللائحة 2437',
+    });
+  }
+
+  // إذا لم يتم تطابق أي موضوع رئيسي، نضيف إشارة سن واستحقاق المعاش كشرح مرئي أساسي
+  if (sequence.length <= 1) {
+    sequence.push({
+      id: 'pension_general_sign',
+      title: 'إشارة: حقوق واشتراكات التأمين الاجتماعي',
+      signDescription: 'لمس الذقن بالسبابة دلالة على الحماية والوقار التأميني، ثم حركة عد مالي للأصابع إشارة لاستحقاق المعاش.',
+      handMovement: 'حركة يد متدرجة لأعلى تعبر عن كفالة الدولة وتأمين المستقبل المالي للمواطن وأسرته.',
+      facialExpression: 'ملامح اطمئنان وثقة.',
+      keyNotice: 'التأمين الاجتماعي يكفل للمواطن معاشاً شهرياً وحماية اجتماعية كاملة وفقاً للقانون 148.',
+      durationSeconds: 5,
+      highlightWords: ['معاش شهري', 'حماية اجتماعية', 'تأمين المستقبل'],
+      visualIcon: '🛡️',
+      badgeText: 'حقوق التأمين',
+      diagramImage: '/assets/sign_pension_age.jpg',
+      legalArticle: 'قانون 148 لسنة 2019',
     });
   }
 
@@ -322,6 +348,7 @@ export function generateSignSequenceFromText(botResponse: string): VisualSignSeq
     highlightWords: ['مكتب التأمينات', 'الخط الساخن 16217', 'تحت أمرك'],
     visualIcon: '🏢',
     badgeText: 'الخطوة العملية',
+    diagramImage: '/assets/sign_language_interpreter.jpg',
     legalArticle: 'خدمة المواطنين',
   });
 

@@ -187,8 +187,23 @@ export const SignLanguageDictionaryModal: React.FC<SignLanguageDictionaryModalPr
                 )}
               </div>
 
+              {/* Visual Diagram Demonstration */}
+              {activeTerm.videoThumbnail && (
+                <div className="my-3 rounded-2xl overflow-hidden border border-slate-700 bg-black aspect-video relative group shadow-md">
+                  <img
+                    src={activeTerm.videoThumbnail}
+                    alt={activeTerm.term}
+                    className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-102"
+                  />
+                  <div className="absolute top-2 right-2 bg-slate-900/80 backdrop-blur-xs text-emerald-300 text-[10px] px-2 py-0.5 rounded-full font-bold border border-emerald-500/30 flex items-center gap-1">
+                    <span>{activeTerm.visualIcon}</span>
+                    <span>مخطط حركات الإشارة</span>
+                  </div>
+                </div>
+              )}
+
               {/* Summary Description */}
-              <div className="my-3.5 bg-emerald-950/40 p-3.5 rounded-xl border border-emerald-600/40 text-emerald-100 text-xs sm:text-sm leading-relaxed">
+              <div className="my-3 bg-emerald-950/40 p-3 rounded-xl border border-emerald-600/40 text-emerald-100 text-xs sm:text-sm leading-relaxed">
                 <span className="font-bold text-emerald-300 block mb-1">
                   المعنى القانوني والتأميني:
                 </span>
@@ -196,8 +211,8 @@ export const SignLanguageDictionaryModal: React.FC<SignLanguageDictionaryModalPr
               </div>
 
               {/* Hand and Face Physical Instructions */}
-              <div className="space-y-3 text-xs text-slate-300">
-                <div className="p-3 bg-slate-900 rounded-xl border border-slate-800">
+              <div className="space-y-2.5 text-xs text-slate-300">
+                <div className="p-2.5 bg-slate-900 rounded-xl border border-slate-800">
                   <span className="font-bold text-amber-400 block mb-1">
                     👐 الوصف الحركي لليدين والأصابع:
                   </span>
