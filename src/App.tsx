@@ -8,6 +8,9 @@ import { PensionCalculatorModal } from './components/PensionCalculatorModal';
 import { HowToUseGuide } from './components/HowToUseGuide';
 import { ShareAppModal } from './components/ShareAppModal';
 import { SidebarDrawer } from './components/SidebarDrawer';
+import { SignLanguageVideoPlayer } from './components/SignLanguageVideoPlayer';
+import { SignLanguageDictionaryModal } from './components/SignLanguageDictionaryModal';
+import { SignTerm } from './data/signLanguageData';
 import { ChatMessageItem, LegalDocument, ResponseMode } from './types';
 import { ShieldCheck, HelpCircle, RotateCcw, AlertCircle, Share2, Menu, Volume2, VolumeX } from 'lucide-react';
 
@@ -69,6 +72,25 @@ export default function App() {
     }
     return false; // Default to muted to prevent latency and unexpected audio
   });
+
+  const [autoSignLanguage, setAutoSignLanguage] = useState<boolean>(() => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (typeof parsed.autoSignLanguage === 'boolean') return parsed.autoSignLanguage;
+      }
+    } catch {
+      // ignore
+    }
+    return false;
+  });
+
+  const [isSignPlayerOpen, setIsSignPlayerOpen] = useState(false);
+  const [isSignDictOpen, setIsSignDictOpen] = useState(false);
+  const [signLanguageContent, setSignLanguageContent] = useState('');
+  const [signPlayerMode, setSignPlayerMode] = useState<'modal' | 'pip'>('modal');
+
   const [standardDocs, setStandardDocs] = useState<LegalDocument[]>([]);
   const [customDocs, setCustomDocs] = useState<LegalDocument[]>([]);
   const [currentAudio, setCurrentAudio] = useState<HTMLAudioElement | null>(null);
@@ -77,7 +99,7 @@ export default function App() {
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Auto-save state to localStorage whenever messages, mode, or autoPlayVoice change
+  // Auto-save state to localStorage whenever messages, mode, autoPlayVoice, or autoSignLanguage change
   useEffect(() => {
     try {
       const cleanMessages = messages.map((m) => ({ ...m, isStreaming: false }));
@@ -87,12 +109,13 @@ export default function App() {
           messages: cleanMessages,
           mode,
           autoPlayVoice,
+          autoSignLanguage,
         })
       );
     } catch (err) {
       console.warn('Failed to save chat to localStorage:', err);
     }
-  }, [messages, mode, autoPlayVoice]);
+  }, [messages, mode, autoPlayVoice, autoSignLanguage]);
 
   // Handle Device Sleep / Lock / Visibility change & Online/Offline
   useEffect(() => {
@@ -407,6 +430,15 @@ export default function App() {
             handleSpeak(accumulatedText);
           }, 100);
         }
+
+        // Auto-open sign language video player if enabled for deaf citizens
+        if (autoSignLanguage && accumulatedText.trim()) {
+          setTimeout(() => {
+            setSignLanguageContent(accumulatedText);
+            setSignPlayerMode('pip'); // Open in PiP so user can read while watching sign video
+            setIsSignPlayerOpen(true);
+          }, 250);
+        }
       }
     } catch (err: any) {
       console.error('Error generating response:', err);
@@ -433,6 +465,19 @@ export default function App() {
     if (lastUserQueryRef.current) {
       handleSendMessage(lastUserQueryRef.current.text, lastUserQueryRef.current.image);
     }
+  };
+
+  const handleOpenSignLanguage = (content: string, preferMode: 'modal' | 'pip' = 'modal') => {
+    setSignLanguageContent(content);
+    setSignPlayerMode(preferMode);
+    setIsSignPlayerOpen(true);
+  };
+
+  const handleSelectTermForVideo = (term: SignTerm) => {
+    setIsSignDictOpen(false);
+    setSignLanguageContent(`${term.term}: ${term.summary}\n${term.signDescription}\n${term.handMovement}`);
+    setSignPlayerMode('modal');
+    setIsSignPlayerOpen(true);
   };
 
   const handleClearChat = () => {
@@ -484,6 +529,32 @@ export default function App() {
             >
               {autoPlayVoice ? <Volume2 className="w-3.5 h-3.5 text-emerald-600" /> : <VolumeX className="w-3.5 h-3.5 text-slate-400" />}
               <span>{autoPlayVoice ? 'الصوت: تلقائي 🔊' : 'الصوت: مكتوم 🔇'}</span>
+            </button>
+
+            <span className="text-slate-300">|</span>
+
+            {/* Quick Sign Language Video Toggle Pill */}
+            <button
+              type="button"
+              onClick={() => {
+                const nextVal = !autoSignLanguage;
+                setAutoSignLanguage(nextVal);
+                if (nextVal) {
+                  const lastBot = [...messages].reverse().find((m) => m.role === 'assistant' && m.content);
+                  if (lastBot) {
+                    handleOpenSignLanguage(lastBot.content, 'modal');
+                  }
+                }
+              }}
+              className={`flex items-center gap-1 px-2.5 py-1 rounded-lg border text-[11px] font-semibold transition-all cursor-pointer ${
+                autoSignLanguage
+                  ? 'bg-emerald-100 text-emerald-950 border-emerald-400 hover:bg-emerald-200 shadow-2xs font-bold'
+                  : 'bg-slate-100 text-slate-600 border-slate-300 hover:bg-slate-200'
+              }`}
+              title="تفعيل مترجم لغة الإشارة المرئي تلقائياً للصم وضعاف السمع"
+            >
+              <span className="text-xs">🤟</span>
+              <span>{autoSignLanguage ? 'الإشارة: تلقائي' : 'لغة الإشارة'}</span>
             </button>
 
             <span className="text-slate-300">|</span>
@@ -552,6 +623,7 @@ export default function App() {
               isSpeaking={isSpeaking}
               onStopSpeaking={handleStopSpeaking}
               onRetry={handleRetry}
+              onOpenSignLanguage={(text) => handleOpenSignLanguage(text, 'modal')}
             />
           ))}
 
@@ -590,6 +662,29 @@ export default function App() {
         docsCount={standardDocs.length + customDocs.length}
         autoPlayVoice={autoPlayVoice}
         onToggleAutoPlayVoice={() => setAutoPlayVoice(!autoPlayVoice)}
+        autoSignLanguage={autoSignLanguage}
+        onToggleAutoSignLanguage={() => setAutoSignLanguage(!autoSignLanguage)}
+        onOpenSignLanguageDictionary={() => setIsSignDictOpen(true)}
+      />
+
+      {/* Sign Language Video Interpreter Player (Supports Modal & Floating PiP Window) */}
+      <SignLanguageVideoPlayer
+        isOpen={isSignPlayerOpen}
+        onClose={() => setIsSignPlayerOpen(false)}
+        content={signLanguageContent}
+        mode={signPlayerMode}
+        onTogglePipMode={() => setSignPlayerMode(signPlayerMode === 'modal' ? 'pip' : 'modal')}
+        onOpenDictionary={() => {
+          setIsSignPlayerOpen(false);
+          setIsSignDictOpen(true);
+        }}
+      />
+
+      {/* Egyptian Sign Language Illustrated & Video Dictionary Modal */}
+      <SignLanguageDictionaryModal
+        isOpen={isSignDictOpen}
+        onClose={() => setIsSignDictOpen(false)}
+        onSelectTermForVideo={handleSelectTermForVideo}
       />
 
       {/* Legal Documents Knowledge Base Modal */}

@@ -35,6 +35,9 @@ interface SidebarDrawerProps {
   docsCount: number;
   autoPlayVoice: boolean;
   onToggleAutoPlayVoice: () => void;
+  autoSignLanguage: boolean;
+  onToggleAutoSignLanguage: () => void;
+  onOpenSignLanguageDictionary: () => void;
 }
 
 export const SidebarDrawer: React.FC<SidebarDrawerProps> = ({
@@ -50,6 +53,9 @@ export const SidebarDrawer: React.FC<SidebarDrawerProps> = ({
   docsCount,
   autoPlayVoice,
   onToggleAutoPlayVoice,
+  autoSignLanguage,
+  onToggleAutoSignLanguage,
+  onOpenSignLanguageDictionary,
 }) => {
   if (!isOpen) return null;
 
@@ -222,6 +228,52 @@ export const SidebarDrawer: React.FC<SidebarDrawerProps> = ({
             </button>
           </div>
 
+          {/* Section: Sign Language Accessibility (إتاحة لغة الإشارة للصم وضعاف السمع) */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-slate-750 uppercase tracking-wider flex items-center gap-1.5 text-slate-700">
+                <span>الإتاحة ولغة الإشارة للصم والبكم</span>
+                <span className="text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded-md font-bold">جديد</span>
+              </span>
+            </div>
+
+            <button
+              type="button"
+              onClick={onToggleAutoSignLanguage}
+              className={`w-full p-3 rounded-xl border text-right transition-all flex items-center justify-between gap-3 ${
+                autoSignLanguage
+                  ? 'border-emerald-600 bg-emerald-50/80 text-emerald-950 shadow-xs ring-1 ring-emerald-500'
+                  : 'border-slate-200 bg-slate-50/80 text-slate-600'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <div className={`p-2 rounded-lg flex-shrink-0 text-lg ${
+                  autoSignLanguage ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-500'
+                }`}>
+                  🤟
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-xs text-slate-900">تشغيل فيديو لغة الإشارة تلقائياً</span>
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                      autoSignLanguage ? 'bg-emerald-200 text-emerald-900' : 'bg-slate-200 text-slate-600'
+                    }`}>
+                      {autoSignLanguage ? 'مفعّل دائماً' : 'عند الطلب'}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-600 mt-0.5">
+                    فتح شاشة المترجم الإشاري المرئي تلقائياً مع كل استفسار لشرح الوصف بصرياً
+                  </p>
+                </div>
+              </div>
+              <div className={`w-10 h-6 rounded-full transition-colors p-0.5 flex items-center ${
+                autoSignLanguage ? 'bg-emerald-600 justify-end' : 'bg-slate-300 justify-start'
+              }`}>
+                <div className="w-5 h-5 rounded-full bg-white shadow-xs"></div>
+              </div>
+            </button>
+          </div>
+
           {/* PWA Install Button (Prompt to install as App on Mobile/PC) */}
           <div className="pt-1">
             <PWAInstallButton variant="sidebar" />
@@ -283,6 +335,33 @@ export const SidebarDrawer: React.FC<SidebarDrawerProps> = ({
                   </div>
                 </div>
                 <ChevronLeft className="w-4 h-4 text-slate-400 group-hover:text-emerald-700 transition-colors" />
+              </button>
+
+              {/* Sign Language Dictionary */}
+              <button
+                type="button"
+                onClick={() => handleAction(onOpenSignLanguageDictionary)}
+                className="w-full flex items-center justify-between p-3 rounded-xl border border-emerald-200 hover:border-emerald-500 bg-emerald-50/50 hover:bg-emerald-100/60 transition-all text-right group shadow-2xs cursor-pointer"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-lg bg-emerald-700 text-white flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform text-lg shadow-xs">
+                    🤟
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-xs text-slate-900 block group-hover:text-emerald-950">
+                        قاموس لغة الإشارة التأمينية المصرية
+                      </span>
+                      <span className="bg-emerald-200 text-emerald-900 text-[10px] px-1.5 py-0.2 rounded-full font-bold">
+                        مصوّر
+                      </span>
+                    </div>
+                    <span className="text-[11px] text-slate-600">
+                      شرح حركي وبصري لاستمارات ومصطلحات المعاشات للصم
+                    </span>
+                  </div>
+                </div>
+                <ChevronLeft className="w-4 h-4 text-slate-400 group-hover:text-emerald-800 transition-colors" />
               </button>
 
               {/* How to use */}

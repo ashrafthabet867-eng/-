@@ -9,6 +9,7 @@ interface ChatMessageProps {
   isSpeaking: boolean;
   onStopSpeaking: () => void;
   onRetry?: () => void;
+  onOpenSignLanguage?: (text: string) => void;
 }
 
 export const ChatMessage: React.FC<ChatMessageProps> = ({
@@ -17,6 +18,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
   isSpeaking,
   onStopSpeaking,
   onRetry,
+  onOpenSignLanguage,
 }) => {
   const [copied, setCopied] = useState(false);
   const isBot = message.role === 'assistant';
@@ -246,6 +248,18 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
                 </>
               )}
             </button>
+
+            {onOpenSignLanguage && (
+              <button
+                onClick={() => onOpenSignLanguage(message.content)}
+                type="button"
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold transition-all shadow-2xs hover:scale-102 cursor-pointer"
+                title="عرض فيديو الشرح بلغة الإشارة المصرية للصم وضعاف السمع"
+              >
+                <span className="text-sm">🤟</span>
+                <span>فيديو لغة الإشارة</span>
+              </button>
+            )}
 
             <button
               onClick={handleCopy}
