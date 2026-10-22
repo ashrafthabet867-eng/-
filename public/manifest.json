@@ -1,10 +1,13 @@
 {
+  "id": "/",
   "name": "مستشار التأمينات والمعاشات المصري",
-  "short_name": "مستشار التأمينات",
-  "description": "المستشار الذكي للمواطنين وفقاً لقانون التأمينات الاجتماعية والمعاشات رقم 148 لسنة 2019",
+  "short_name": "التأمينات",
+  "description": "المستشار الذكي للهيئة القومية للتأمين الاجتماعي وفقاً لأحكام القانون 148 لسنة 2019 ولائحته التنفيذية رقم 2437 لسنة 2021",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
-  "background_color": "#0f172a",
+  "orientation": "portrait",
+  "background_color": "#0b1e36",
   "theme_color": "#0b1e36",
   "dir": "rtl",
   "lang": "ar",
@@ -13,13 +16,25 @@
       "src": "/logo.svg",
       "sizes": "any",
       "type": "image/svg+xml",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/logo.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
     },
     {
       "src": "/logo.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ]
 }

@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { ResponseMode } from '../types';
 import { AdvisorLogo } from './AdvisorLogo';
+import { PWAInstallButton } from './PWAInstallButton';
 
 interface SidebarDrawerProps {
   isOpen: boolean;
@@ -219,6 +220,11 @@ export const SidebarDrawer: React.FC<SidebarDrawerProps> = ({
                 <div className="w-5 h-5 rounded-full bg-white shadow-xs"></div>
               </div>
             </button>
+          </div>
+
+          {/* PWA Install Button (Prompt to install as App on Mobile/PC) */}
+          <div className="pt-1">
+            <PWAInstallButton variant="sidebar" />
           </div>
 
           <hr className="border-slate-200" />

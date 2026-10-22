@@ -28,74 +28,95 @@ const ai = new GoogleGenAI({
  * Builds the comprehensive system instruction ensuring strict legal grounding,
  * understanding Egyptian dialect, and handling brief vs detailed modes.
  */
-function buildSystemInstruction(mode: 'brief' | 'detailed', activeDocs: LegalArticle[]): string {
-  const documentsContext = activeDocs
+/**
+ * Builds the comprehensive system instruction ensuring strict legal grounding,
+ * understanding Egyptian dialect, and handling brief vs detailed modes.
+ */
+function buildSystemInstruction(mode: 'brief' | 'detailed', activeDocs: LegalArticle[], userQuery: string = ''): string {
+  // Normalize query words for intelligent keyword prioritization
+  const queryLower = (userQuery || '').toLowerCase();
+  const keywords = queryLower.split(/\s+/).filter((w) => w.length > 2);
+
+  // Score docs based on relevance to user's question
+  const scoredDocs = activeDocs.map((doc) => {
+    let score = 0;
+    const textToMatch = `${doc.title} ${doc.number} ${doc.category} ${doc.summary} ${doc.fullText}`.toLowerCase();
+    
+    // Core always-critical topics
+    if (queryLower.includes('مبكر') && (doc.id.includes('early') || doc.title.includes('المبكر'))) score += 10;
+    if (queryLower.includes('وفاة') || queryLower.includes('ورثة') || queryLower.includes('مستحق')) {
+      if (doc.category === 'survivors' || doc.id.includes('survivor')) score += 10;
+    }
+    if (queryLower.includes('اصابة') || queryLower.includes('إصابة') || queryLower.includes('عجز')) {
+      if (doc.category === 'work_injury' || doc.category === 'sickness') score += 10;
+    }
+    if (queryLower.includes('زواج') || queryLower.includes('منحة') || queryLower.includes('جنازة')) {
+      if (doc.category === 'grants') score += 10;
+    }
+    if (queryLower.includes('استمارة') || queryLower.includes('س6') || queryLower.includes('س1')) {
+      if (doc.category === 'forms' || doc.id.includes('form')) score += 10;
+    }
+
+    for (const kw of keywords) {
+      if (textToMatch.includes(kw)) score += 2;
+    }
+    return { doc, score };
+  });
+
+  // Sort by relevance score
+  scoredDocs.sort((a, b) => b.score - a.score);
+
+  // Top relevant docs get full text; remaining docs get concise summaries to avoid prompt bloat
+  const topDocs = scoredDocs.slice(0, 6);
+  const remainingDocs = scoredDocs.slice(6);
+
+  const primaryContext = topDocs
     .map(
-      (doc) => `
-[وثيقة رسمية: ${doc.number} - ${doc.title}]
+      ({ doc }) => `
+[وثيقة معتمدة أولوية: ${doc.number} - ${doc.title}]
 التصنيف: ${doc.category}
 الموجز: ${doc.summary}
-النص القانوني الكامل والضوابط:
+النص القانوني والضوابط:
 ${doc.fullText}
-${doc.conditions && doc.conditions.length > 0 ? `الشروط الواجبة: \n- ${doc.conditions.join('\n- ')}` : ''}
-${doc.requiredDocs && doc.requiredDocs.length > 0 ? `الأوراق والمستندات المطلوبة: \n- ${doc.requiredDocs.join('\n- ')}` : ''}
+${doc.conditions && doc.conditions.length > 0 ? `الشروط: \n- ${doc.conditions.join('\n- ')}` : ''}
+${doc.requiredDocs && doc.requiredDocs.length > 0 ? `الأوراق المطلوبة: \n- ${doc.requiredDocs.join('\n- ')}` : ''}
 `
     )
     .join('\n----------------------------------------\n');
 
+  const secondaryIndex = remainingDocs
+    .map(({ doc }) => `- ${doc.number} (${doc.title}): ${doc.summary}`)
+    .join('\n');
+
   return `
 أنت "مستشار التأمينات والمعاشات المصري" - المساعد الرقمي الخبير للهيئة القومية للتأمين الاجتماعي بجمهورية مصر العربية.
-مهمتك الأساسية: مساعدة المواطنين المتعاملين مع الهيئة والإجابة على تساؤلاتهم وتقديم الفتوى التأمينية الدقيقة.
+مهمتك الأساسية: مساعدة المواطنين المتعاملين مع الهيئة والإجابة على تساؤلاتهم وتقديم الفتوى التأمينية الدقيقة بسرعة ووضوح تام.
 
-قواعد العمل الإلزامية الصارمة:
-1. **الحصر التام في المستندات والتشريعات المرفقة فقط**:
-   - كافة إجاباتك ومعلوماتك وشروطك وقراراتك **محصورة ومقيدة تماماً** بنصوص ومواد:
-     * قانون التأمينات الاجتماعية والمعاشات رقم 148 لسنة 2019.
-     * اللائحة التنفيذية رقم 2437 لسنة 2021 (الصادرة بقرار رئيس مجلس الوزراء رقم 2437 لسنة 2021).
-     * الجداول التأمينية المرفقة (جدول 1 لنسب الاشتراكات، جدول 2 للعمالة غير المنتظمة، جدول 5 للمعامل الاكتواري والمعاش المبكر، جدول 7 لتوزيع المعاش على المستحقين، وجدول تدرج رفع سن المعاش).
-     * النماذج والاستمارات الرسمية (استمارات 1 و 2 و 6، ونماذج 102 و 105 و 111 و 119 و 120 و 124).
-     * التعديلات والقرارات اللاحقة لعامي 2024 و 2025 و 2026 (الحدود الدنيا والقصوى للأجور والمعاشات وشرط 25 سنة اشتراك فعلي للمعاش المبكر بدءاً من 2025).
-     * الوثائق وملفات الـ PDF المرفقة والمفهرسة أدناه.
-   - ممنوع منعاً باتاً التأليف أو التخمين أو الاستناد إلى قوانين ملغاة (مثل القانون 79 لسنة 1975 القديم أو قانون 108 أو 112 القديمة) إلا عند توضيح الفارق إن سأل المواطن.
-   - إذا سألك المواطن عن مسألة خارج اختصاص القانون أو تتطلب كشفاً طبياً لدى القومسيون الطبي أو قراراً داخلياً تقديرياً لمكتب التأمينات التابع له، أخبره بذلك بكل صدق ووجهه إلى مراجعة أقرب فرع للهيئة أو الاتصال بالخط الساخن 16217.
-   - اذكر دائماً رقم المادة القانونية (مثل: المادة 21 بند 6، المادة 104، المادة 105، قرار 2437 لسنة 2021، إلخ) كسند قطعي.
+القواعد الإلزامية:
+1. **المرجعية التشريعية الحصرية**:
+   - كافة إجاباتك محصورة بنصوص قانون التأمينات رقم 148 لسنة 2019، اللائحة التنفيذية 2437 لسنة 2021، وجداول ونماذج الهيئة الرسمية.
+   - شرط المعاش المبكر لعام 2025/2026 فصاعداً: **25 سنة اشتراك فعلي كاملة (300 شهر)** + مدة تسفر عن 50% من أجر التسوية + 65% من الحد الأدنى لأجر الاشتراك.
+   - سن المعاش يرتفع تدريجياً بدءاً من يوليو 2032 (61 سنة) ليصل إلى 65 سنة في يوليو 2040.
+   - اذكر رقم المادة دائماً (مثلاً: المادة 21 بند 6، المادة 104، قرار 2437...).
+   - ممنوع التخمين أو الاستناد لقوانين ملغاة (مثل قانون 79 لسنة 1975).
 
-2. **الفهم العميق للغة العامية المصرية**:
-   - المواطن المصري قد يتحدث بالعامية الدارجة البسيطة (مثل: "عايز اطلع معاش مبكر"، "صاحب الشغل مش مأمن عليا"، "البرنت التأميني اطلعه ازاي"، "والدي اتوفى واختي متجوزة"، "منحة الجواز دي بتتصرف ازاي"، "س6 دي ايه"، "معاش تكافل وكرامة يتعارض؟"، "مرتبي 5000 يتأمن عليا بكام؟").
-   - حلل مقصود المواطن واستفساره بعمق، وتفهم ظروفه الإنسانية والاجتماعية (في حالات الوفاة قدم واجب العزاء برفق "البقاء لله يا فندم"، وفي حالات الزواج بارك "ألف مبروك"، وبشكل عام تعامل باحترام ومودة بالغة).
-   - رُدّ بلغة عربية مصرية مهذبة وواضحة جداً، سهلة الفهم للجميع ومطعمة بالعبارات الرسمية المهذبة ("يا فندم"، "تحت أمرك"، "حقك القانوني محفوظ").
+2. **اللهجة والأسلوب المصري**:
+   - خاطب المواطن بالعامية المصرية الودودة والمهذبة ("يا فندم"، "تحت أمرك"، "ألف مبروك"، "البقاء لله").
+   - بسّط المصطلحات الإدارية المعقدة (وضح ما هي "استمارة 6"، "البرنت التأميني"، "كود المنشأة").
 
-3. **نمط الرد الحالي المختار: [${mode === 'brief' ? 'خيار الرد المختصر' : 'خيار الرد المفصل'}]**:
+3. **نمط الرد: [${mode === 'brief' ? 'خيار الرد المختصر' : 'خيار الرد المفصل'}]**:
 ${
   mode === 'brief'
-    ? `
-   - **الرد المختصر**:
-     * قدّم إجابة مباشرة، سريعة، وموجزة جداً في نقاط مركزة (لا تزيد عن 3 إلى 5 أسطر/نقاط).
-     * ابدأ بالقرار الحاسم: (ينطبق عليك كذا / لا ينطبق بسبب كذا).
-     * اذكر أهم خطوة عملية ورقم المادة فقط.
-     * تجنب التفاصيل المطولة وركز على ما يهم المواطن فوراً لتوفير وقته.
-`
-    : `
-   - **الرد المفصل (الشرح القانوني والإجرائي الكامل)**:
-     * قدّم شرحاً شاملاً مقسماً بعناوين واضحة:
-       1. **الرأي القانوني المباشر والسند التشريعي**: رقم المادة من القانون 148 لسنة 2019.
-       2. **الشروط الواجب توافرها بالكامل**: فحص كل شرط وإمكانية انطباقه.
-       3. **الأوراق والمستندات الرسمية المطلوبة**: قائمة واضحة ومحددة بالأوراق (مثل: استمارة 6، شهادة ميلاد كمبيوتر، برنت تأميني، شهادة وفاة مميكنة...).
-       4. **الخطوات العملية للتقديم**: أين يتوجه المواطن بالتحديد وكيفية تسليم الملف.
-       5. **الحسابات والأرقام المتوقعة**: إن كان السؤال متعلقاً بحساب قيمة المعاش أو نسبة الاشتراك أو منحة الزواج والوفاة.
-       6. **تنبيهات وملاحظات قانونية هامة**: مثل مدد التقادم وسقوط الحقوق (5 سنوات في منحة الزواج مثلاً).
-`
+    ? `   - **الرد المختصر**: قدّم الخلاصة المباشرة والقرار القانوني الحاسم في 3 إلى 5 أسطر مركزة مع رقم المادة القانونية، لتوفير وقت المواطن.`
+    : `   - **الرد المفصل**: قدّم تفنيداً شاملاً (1. السند القانوني، 2. الشروط التفصيلية، 3. الأوراق المطلوبة، 4. الخطوات التنفيذية، 5. الحسابات إن وجدت).`
 }
 
-4. **تحليل الصور والمستندات المرفقة (Multimodal)**:
-   - عند إرسال المواطن صورة لمستند (مثل: بطاقة رقم قومي، برنت تأميني، استمارة 6، شهادة وفاة، إشعار سداد، قسيمة زواج، عقد عمل، تقرير طبي):
-     * تعرّف على نوع المستند بدقة.
-     * استخرج البيانات المؤثرة (الاسم، الرقم التأميني، الرقم القومي، تاريخ الميلاد، تاريخ إنهاء الخدمة، المدد المسجلة، الأجر التأميني).
-     * طابق البيانات مع شروط القانون 148 لسنة 2019 وأخبر المواطن بوضعه التأميني بدقة وما إذا كان المستند مكتملاً أم ينقصه أختام أو بيانات.
-
-المستندات القانونية المعتمدة الحصرية التي تبني عليها كل ردودك:
+المستندات القانونية ذات الصلة المباشرة:
 ========================================
-${documentsContext}
+${primaryContext}
+
+فهرس باقي المواد والقرارات:
+${secondaryIndex}
 ========================================
 `;
 }
@@ -251,7 +272,7 @@ app.post('/api/documents/upload-pdf', async (req, res) => {
   }
 });
 
-// Endpoint: Streaming Chat with Gemini 3.8 Flash (Server-Sent Events)
+// Endpoint: Ultra-fast Streaming Chat (Server-Sent Events)
 app.post('/api/chat/stream', async (req, res) => {
   try {
     if (!apiKey) {
@@ -262,39 +283,43 @@ app.post('/api/chat/stream', async (req, res) => {
 
     const { messages, mode = 'brief', image, customDocuments = [] } = req.body;
 
+    // Take only the most recent 6 messages to keep latency low and avoid token compounding
+    const recentMessages = Array.isArray(messages) ? messages.slice(-6) : [];
+    const lastUserQuery =
+      recentMessages
+        .filter((m: any) => m.role === 'user')
+        .slice(-1)[0]?.content || '';
+
     const allActiveDocs = [...OFFICIAL_LAW_DOCUMENTS, ...customLawDocs, ...customDocuments];
-    const systemInstruction = buildSystemInstruction(mode, allActiveDocs);
+    const systemInstruction = buildSystemInstruction(mode, allActiveDocs, lastUserQuery);
 
     // Format chat contents for Gemini SDK
-    // Structure: array of { role: 'user' | 'model', parts: [{ text: string }, { inlineData?: ... }] }
     const contents: any[] = [];
 
-    if (Array.isArray(messages)) {
-      for (let i = 0; i < messages.length; i++) {
-        const msg = messages[i];
-        const isLastMessage = i === messages.length - 1;
-        const parts: any[] = [];
+    for (let i = 0; i < recentMessages.length; i++) {
+      const msg = recentMessages[i];
+      const isLastMessage = i === recentMessages.length - 1;
+      const parts: any[] = [];
 
-        // If last message and image is attached
-        if (isLastMessage && image && image.data) {
-          parts.push({
-            inlineData: {
-              mimeType: image.mimeType || 'image/jpeg',
-              data: image.data,
-            },
-          });
-        }
+      // If last message and image is attached
+      if (isLastMessage && image && image.data) {
+        parts.push({
+          inlineData: {
+            mimeType: image.mimeType || 'image/jpeg',
+            data: image.data,
+          },
+        });
+      }
 
-        if (msg.content) {
-          parts.push({ text: msg.content });
-        }
+      if (msg.content) {
+        parts.push({ text: msg.content });
+      }
 
-        if (parts.length > 0) {
-          contents.push({
-            role: msg.role === 'assistant' || msg.role === 'model' ? 'model' : 'user',
-            parts,
-          });
-        }
+      if (parts.length > 0) {
+        contents.push({
+          role: msg.role === 'assistant' || msg.role === 'model' ? 'model' : 'user',
+          parts,
+        });
       }
     }
 
@@ -304,53 +329,46 @@ app.post('/api/chat/stream', async (req, res) => {
       return;
     }
 
-    // Set SSE headers
+    // Set SSE headers with anti-buffering for Cloud Run / Nginx
     res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
     res.setHeader('Cache-Control', 'no-cache, no-transform');
     res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
     res.flushHeaders?.();
+    // Immediate keepalive comment to flush intermediate proxy buffers
+    res.write(': keepalive\n\n');
 
-    let responseStream;
-    let usedModel = 'gemini-3.1-flash-lite';
+    let responseStream: any = null;
+    let selectedModel = '';
 
-    try {
-      // Primary model: gemini-3.1-flash-lite (ultra-fast, streams in ~350-500ms)
-      responseStream = await ai.models.generateContentStream({
-        model: 'gemini-3.1-flash-lite',
-        contents,
-        config: {
-          systemInstruction,
-          temperature: 0.2,
-        },
-      });
-    } catch (primaryErr: any) {
-      console.warn('gemini-3.1-flash-lite error, attempting fallback to gemini-3.8-flash:', primaryErr?.message);
+    // Fast and reliable model hierarchy (verified sub-second TTFT)
+    const modelsToTry = [
+      'gemini-flash-lite-latest',
+      'gemini-3.5-flash-lite',
+      'gemini-3.5-flash',
+      'gemini-3.1-flash-lite',
+      'gemini-3.6-flash',
+    ];
+
+    for (const modelName of modelsToTry) {
       try {
-        usedModel = 'gemini-3.8-flash';
         responseStream = await ai.models.generateContentStream({
-          model: 'gemini-3.8-flash',
+          model: modelName,
           contents,
           config: {
             systemInstruction,
             temperature: 0.2,
           },
         });
-      } catch (fallback1Err: any) {
-        console.warn('gemini-3.8-flash error, attempting fallback to gemini-flash-latest:', fallback1Err?.message);
-        try {
-          usedModel = 'gemini-flash-latest';
-          responseStream = await ai.models.generateContentStream({
-            model: 'gemini-flash-latest',
-            contents,
-            config: {
-              systemInstruction,
-              temperature: 0.2,
-            },
-          });
-        } catch (fallback2Err: any) {
-          throw new Error('خوادم الذكاء الاصطناعي تشهد ضغطاً مؤقتاً. يرجى إعادة المحاولة.');
-        }
+        selectedModel = modelName;
+        break; // Successfully started stream
+      } catch (err: any) {
+        console.warn(`Model ${modelName} stream failed (${err?.status || err?.message?.slice(0, 50)}), trying next fallback...`);
       }
+    }
+
+    if (!responseStream) {
+      throw new Error('خوادم الذكاء الاصطناعي تشهد ضغطاً مؤقتاً. يرجى الضغط على زر إعادة المحاولة.');
     }
 
     try {
@@ -364,14 +382,16 @@ app.post('/api/chat/stream', async (req, res) => {
       res.end();
     } catch (streamErr: any) {
       console.error('Error during streaming consumption:', streamErr);
-      res.write(`data: ${JSON.stringify({ 
-        error: 'انقطع الاتصال المؤقت بالخادم أثناء تدفق الإجابة بسبب ضغط لحظي. يرجى الضغط على زر إعادة المحاولة.' 
-      })}\n\n`);
+      res.write(
+        `data: ${JSON.stringify({
+          error: 'انقطع الاتصال بالخادم أثناء تدفق الإجابة. يرجى الضغط على زر إعادة المحاولة.',
+        })}\n\n`
+      );
       res.end();
     }
   } catch (err: any) {
     console.error('Chat stream error:', err);
-    let friendlyMessage = 'عذراً يا فندم، تشهد خوادم الذكاء الاصطناعي ضغطاً لحظياً مرتفعاً (503 High Demand). هذا عارض ومؤقت، يرجى الضغط على زر "إعادة المحاولة" بعد لحظات.';
+    let friendlyMessage = 'عذراً يا فندم، تشهد خوادم الذكاء الاصطناعي ضغطاً لحظياً مرتفعاً. يرجى الضغط على زر "إعادة المحاولة" بعد لحظات.';
     if (err.message && !err.message.includes('{')) {
       friendlyMessage = err.message;
     }
@@ -520,37 +540,19 @@ app.post('/api/transcribe', async (req, res) => {
 
     let responseText = '';
 
-    // Primary: gemini-3.8-flash with high accuracy for Egyptian Arabic audio
-    try {
-      const response1 = await ai.models.generateContent({
-        model: 'gemini-3.8-flash',
-        contents: {
-          parts: [
-            {
-              inlineData: {
-                mimeType: cleanMimeType,
-                data: audioData,
-              },
-            },
-            {
-              text: 'أنت خبير تفريغ صوتي متخصص في اللهجة العامية المصرية ومصطلحات التأمينات والمعاشات. استمع للمقطع الصوتي واكتب الكلام المنطوق فقط بدون أي مقدمات أو علامات إضافية.',
-            },
-          ],
-        },
-        config: {
-          temperature: 0.1,
-        },
-      });
-      responseText = response1.text?.trim() || '';
-    } catch (err1) {
-      console.warn('gemini-3.8-flash transcribe error, trying gemini-3.1-flash-lite:', err1);
-    }
+    // Fast models hierarchy for Egyptian Arabic voice transcription
+    const transcribeModels = [
+      'gemini-3.5-flash',
+      'gemini-flash-lite-latest',
+      'gemini-3.5-transcribe',
+      'gemini-3.1-flash-lite',
+      'gemini-3.8-flash',
+    ];
 
-    // Fallback if empty or failed: gemini-3.1-flash-lite
-    if (!responseText) {
+    for (const model of transcribeModels) {
       try {
-        const response2 = await ai.models.generateContent({
-          model: 'gemini-3.1-flash-lite',
+        const response = await ai.models.generateContent({
+          model,
           contents: {
             parts: [
               {
@@ -560,7 +562,7 @@ app.post('/api/transcribe', async (req, res) => {
                 },
               },
               {
-                text: 'استمع للمقطع الصوتي واكتب نص الكلمات المنطوقة باللغة العربية العامية المصرية بدقة.',
+                text: 'أنت خبير تفريغ صوتي متخصص في اللهجة العامية المصرية ومصطلحات التأمينات والمعاشات. استمع للمقطع الصوتي واكتب الكلام المنطوق فقط باللغة العربية بدون أي مقدمات أو علامات إضافية.',
               },
             ],
           },
@@ -568,9 +570,12 @@ app.post('/api/transcribe', async (req, res) => {
             temperature: 0.1,
           },
         });
-        responseText = response2.text?.trim() || '';
-      } catch (err2) {
-        console.warn('gemini-3.1-flash-lite fallback error:', err2);
+        if (response.text && response.text.trim()) {
+          responseText = response.text.trim();
+          break;
+        }
+      } catch (err: any) {
+        console.warn(`Transcribe model ${model} failed (${err?.status || err?.message?.slice(0, 40)}), trying next...`);
       }
     }
 

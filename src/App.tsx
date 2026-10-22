@@ -11,31 +11,130 @@ import { SidebarDrawer } from './components/SidebarDrawer';
 import { ChatMessageItem, LegalDocument, ResponseMode } from './types';
 import { ShieldCheck, HelpCircle, RotateCcw, AlertCircle, Share2, Menu, Volume2, VolumeX } from 'lucide-react';
 
-export default function App() {
-  const [messages, setMessages] = useState<ChatMessageItem[]>([
-    {
-      id: 'welcome-msg',
-      role: 'assistant',
-      content: 'أهلاً بحضرتك يا فندم في **المستشار التأميني الذكي** التابع للهيئة القومية للتأمين الاجتماعي. 🏛️',
-      mode: 'brief',
-      timestamp: new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }),
-    },
-  ]);
+const STORAGE_KEY = 'egyptian_pension_assistant_v3';
 
-  const [mode, setMode] = useState<ResponseMode>('brief');
+export default function App() {
+  // Initialize state from localStorage so conversations survive locking/closing the device
+  const [messages, setMessages] = useState<ChatMessageItem[]>(() => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed.messages) && parsed.messages.length > 0) {
+          return parsed.messages.map((m: ChatMessageItem) => ({ ...m, isStreaming: false }));
+        }
+      }
+    } catch (err) {
+      console.warn('Failed to load persisted messages from localStorage:', err);
+    }
+    return [
+      {
+        id: 'welcome-msg',
+        role: 'assistant',
+        content: 'أهلاً بحضرتك يا فندم في **المستشار التأميني الذكي** التابع للهيئة القومية للتأمين الاجتماعي. 🏛️\n\nأنا جاهز للإجابة على استفساراتك التأمينية وفقاً للقانون 148 لسنة 2019 ولائحته 2437، أو فحص مستنداتك وحساب معاشك.',
+        mode: 'brief',
+        timestamp: new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }),
+      },
+    ];
+  });
+
+  const [mode, setMode] = useState<ResponseMode>(() => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed.mode === 'brief' || parsed.mode === 'detailed') return parsed.mode;
+      }
+    } catch {
+      // ignore
+    }
+    return 'brief';
+  });
+
   const [isLoading, setIsLoading] = useState(false);
   const [isDocsOpen, setIsDocsOpen] = useState(false);
   const [isCalcOpen, setIsCalcOpen] = useState(false);
   const [isHowToUseOpen, setIsHowToUseOpen] = useState(false);
   const [isShareOpen, setIsShareOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [autoPlayVoice, setAutoPlayVoice] = useState(true);
+  const [autoPlayVoice, setAutoPlayVoice] = useState<boolean>(() => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (typeof parsed.autoPlayVoice === 'boolean') return parsed.autoPlayVoice;
+      }
+    } catch {
+      // ignore
+    }
+    return false; // Default to muted to prevent latency and unexpected audio
+  });
   const [standardDocs, setStandardDocs] = useState<LegalDocument[]>([]);
   const [customDocs, setCustomDocs] = useState<LegalDocument[]>([]);
   const [currentAudio, setCurrentAudio] = useState<HTMLAudioElement | null>(null);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Auto-save state to localStorage whenever messages, mode, or autoPlayVoice change
+  useEffect(() => {
+    try {
+      const cleanMessages = messages.map((m) => ({ ...m, isStreaming: false }));
+      localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({
+          messages: cleanMessages,
+          mode,
+          autoPlayVoice,
+        })
+      );
+    } catch (err) {
+      console.warn('Failed to save chat to localStorage:', err);
+    }
+  }, [messages, mode, autoPlayVoice]);
+
+  // Handle Device Sleep / Lock / Visibility change & Online/Offline
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    const handleVisibilityChange = () => {
+      // When user unlocks phone or opens laptop lid
+      if (document.visibilityState === 'visible') {
+        setMessages((prev) => {
+          const hasStreaming = prev.some((m) => m.isStreaming);
+          if (hasStreaming) {
+            return prev.map((m) =>
+              m.isStreaming
+                ? {
+                    ...m,
+                    isStreaming: false,
+                    content:
+                      m.content.trim()
+                        ? m.content + '\n\n*(توقف تدفق الإجابة مؤقتاً عند قفل الجهاز. اضغط على زر "إعادة المحاولة" بالأسفل لاستكمال الرد)*'
+                        : '⚠️ توقف الاتصال مؤقتاً عند قفل شاشة الجهاز أو سكونه. اضغط على زر "إعادة المحاولة" لمتابعة الإجابة فوراً.',
+                    hasError: true,
+                  }
+                : m
+            );
+          }
+          return prev;
+        });
+        setIsLoading(false);
+      }
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, []);
 
   // Auto-scroll to bottom of chat
   const scrollToBottom = () => {
@@ -215,7 +314,8 @@ export default function App() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          messages: newHistory.map((m) => ({
+          // Send last 6 messages to avoid compounding prompt token latency
+          messages: newHistory.slice(-6).map((m) => ({
             role: m.role,
             content: m.content,
           })),
@@ -301,7 +401,7 @@ export default function App() {
           )
         );
 
-        // Auto-play response voice directly as requested
+        // Auto-play response voice directly if enabled
         if (autoPlayVoice && accumulatedText.trim()) {
           setTimeout(() => {
             handleSpeak(accumulatedText);
@@ -338,11 +438,16 @@ export default function App() {
   const handleClearChat = () => {
     if (window.confirm('هل تريد مسح سجل المحادثة والبدء من جديد؟')) {
       handleStopSpeaking();
+      try {
+        localStorage.removeItem(STORAGE_KEY);
+      } catch {
+        // ignore
+      }
       setMessages([
         {
           id: 'welcome-reset',
           role: 'assistant',
-          content: 'أهلاً بك من جديد يا فندم. تفضل بطرح استفسارك التأميني أو ارفع مستندك وسأكون سعيداً بمساعدتك.',
+          content: 'أهلاً بك من جديد يا فندم. تفضل بطرح استفسارك التأميني وسأكون سعيداً بمساعدتك.',
           mode,
           timestamp: new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }),
         },
@@ -422,6 +527,18 @@ export default function App() {
             >
               إيقاف الصوت
             </button>
+          </div>
+        )}
+
+        {/* Offline Connectivity Warning Banner */}
+        {!isOnline && (
+          <div className="mb-2 bg-amber-600 text-white text-xs px-3.5 py-2 rounded-xl flex items-center justify-between shadow-sm animate-pulse">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 flex-shrink-0" />
+              <span className="font-medium">
+                أنت الآن غير متصل بالإنترنت. محادثاتك ومستنداتك محفوظة بأمان على جهازك وسيستأنف المستشار الرد فور عودة الشبكة.
+              </span>
+            </div>
           </div>
         )}
 

@@ -7,6 +7,10 @@
     <link rel="apple-touch-icon" href="/logo.png" />
     <link rel="manifest" href="/manifest.json" />
     <meta name="theme-color" content="#0b1e36" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="التأمينات" />
     <title>مستشار التأمينات والمعاشات المصري</title>
     <meta name="description" content="المستشار الذكي للمواطنين المتعاملين مع الهيئة القومية للتأمين الاجتماعي وفقاً لأحكام القانون 148 لسنة 2019 ولائحته التنفيذية رقم 2437 لسنة 2021 والجداول والنماذج التأمينية المرفقة، مع إمكانية رفع وتحليل ملفات الـ PDF والردود بالعامية المصرية." />
     <meta property="og:title" content="مستشار التأمينات والمعاشات المصري" />
@@ -20,6 +24,20 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js').then(
+            (reg) => {
+              console.log('PWA ServiceWorker registered successfully:', reg.scope);
+            },
+            (err) => {
+              console.warn('PWA ServiceWorker registration failed:', err);
+            }
+          );
+        });
+      }
+    </script>
   </body>
 </html>
 
