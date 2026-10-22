@@ -188,169 +188,258 @@ export interface VisualSignSequenceItem {
 }
 
 /**
- * يحلل نص إجابة المساعد ويستخرج تسلسل مرئي دقيق بلغة الإشارة المصرية
+ * يحلل نص الإجابة ويستخرج فقط الإشارة الدقيقة المتطابقة مع سؤال وموضوع المواطن
+ * دون تكرار إشارات لمواضيع أخرى غير مطلوبة
  */
 export function generateSignSequenceFromText(botResponse: string): VisualSignSequenceItem[] {
-  const sequence: VisualSignSequenceItem[] = [];
-  const lower = (botResponse || '').toLowerCase();
+  const text = (botResponse || '').toLowerCase();
 
-  // 1. الترحيب والتقديم الرسمي
-  sequence.push({
-    id: 'intro',
-    title: 'تحية رسمية - الهيئة القومية للتأمين الاجتماعي',
-    signDescription: 'وضع الكف الأيمن على الصدر مع إمالة خفيفة للرأس تعبيراً عن الترحيب والاحترام الكامل، ثم فتح الكفين لأعلى.',
-    handMovement: 'كف اليد اليمنى ينطلق من الصدر ممتداً للأمام في حركة ترحيب بالضيف.',
-    facialExpression: 'ابتسامة دافئة وواضحة جداً مع نظرة ترحيب مطمئنة.',
-    keyNotice: 'أهلاً بك يا فندم، أنا مستشارك التأميني وسأشرح لك بالصوت والإشارة.',
-    durationSeconds: 4,
-    highlightWords: ['أهلاً بك', 'التأمين الاجتماعي', 'تحت أمرك'],
-    visualIcon: '🏛️',
-    badgeText: 'تحية رسمية',
-    diagramImage: '/assets/sign_language_interpreter.jpg',
-    legalArticle: 'قانون 148 لسنة 2019',
-  });
+  // نظام حساب النقاط لاختيار موضوع السؤال الفعلي بدقة
+  const scores: Record<string, number> = {
+    early_retirement: 0,
+    form_6: 0,
+    marriage_grant: 0,
+    survivor_pension: 0,
+    insurance_printout: 0,
+    pension_age: 0,
+    work_injury: 0,
+  };
 
-  // 2. فحص المعاش المبكر
-  if (lower.includes('مبكر') || lower.includes('25 سنة') || lower.includes('300 شهر')) {
-    sequence.push({
-      id: 'early_retire_sign',
-      title: 'إشارة: شروط المعاش المبكر لعام 2025/2026',
-      signDescription: 'إشارة اليدين المتقاطعتين على الصدر للدلالة على ترك العمل قبل الموعد، تليها إشارة الأرقام (25 سنة اشتراك فعلي).',
-      handMovement: 'حركة قطع بكف اليد اليمنى ثم فرد أصابع اليدين للإشارة للرقم 25 ثم لمس معصم اليد للدلالة على السنين.',
-      facialExpression: 'ملامح تأكيد وتوضيح للشروط الصارمة.',
-      keyNotice: 'الشرط الأهم: 25 سنة اشتراك فعلي (300 شهر) كاملة بدون مدد مشتراة.',
-      durationSeconds: 6,
-      highlightWords: ['25 سنة', '300 شهر', 'اشتراك فعلي', '50% من الأجر'],
-      visualIcon: '⏳',
-      badgeText: 'المعاش المبكر',
-      diagramImage: '/assets/sign_early_retire.jpg',
-      legalArticle: 'المادة 21 بند 6',
-    });
+  // 1. المعاش المبكر
+  if (text.includes('مبكر')) scores.early_retirement += 12;
+  if (text.includes('25 سنة') || text.includes('300 شهر')) scores.early_retirement += 10;
+  if (text.includes('تقاعد مبكر') || text.includes('خروج معاش مبكر')) scores.early_retirement += 12;
+  if (text.includes('50% من أجر') || text.includes('تسوية المعاش المبكر')) scores.early_retirement += 8;
+
+  // 2. استمارة 6 وإنهاء الخدمة
+  if (text.includes('استمارة 6') || text.includes('س6') || text.includes('استمارة ستة')) scores.form_6 += 15;
+  if (text.includes('استقالة') || text.includes('إنهاء خدمة') || text.includes('فصل تعسفي') || text.includes('ترك العمل')) scores.form_6 += 8;
+
+  // 3. منحة الزواج
+  if (text.includes('منحة زواج') || text.includes('منحة الزواج')) scores.marriage_grant += 15;
+  if (text.includes('زواج') || text.includes('عقد قران') || text.includes('قسيمة زواج')) scores.marriage_grant += 6;
+  if (text.includes('عروس') || text.includes('ابنة') || text.includes('أخت')) scores.marriage_grant += 4;
+
+  // 4. معاش الوفاة والورثة والمستحقين
+  if (text.includes('وفاة') || text.includes('متوفى') || text.includes('وفاه')) scores.survivor_pension += 10;
+  if (text.includes('ورثة') || text.includes('مستحقين') || text.includes('أرملة') || text.includes('أيتام') || text.includes('جدول 7')) scores.survivor_pension += 8;
+  if (text.includes('منحة وفاة') || text.includes('مصاريف جنازة')) scores.survivor_pension += 10;
+
+  // 5. البرنت التأميني والأرقام
+  if (text.includes('برنت') || text.includes('برنت تأميني')) scores.insurance_printout += 15;
+  if (text.includes('رقم تأميني') || text.includes('بيان مدد') || text.includes('سجل تأميني')) scores.insurance_printout += 8;
+
+  // 6. إصابة العمل والعجز
+  if (text.includes('إصابة عمل') || text.includes('حادث عمل') || text.includes('عجز')) scores.work_injury += 12;
+
+  // 7. سن المعاش القانوني وتدرجه
+  if (text.includes('سن 60') || text.includes('سن 65') || text.includes('تدرج السن') || text.includes('سن الشيخوخة') || text.includes('بلوغ السن') || text.includes('يوليو 2032')) scores.pension_age += 12;
+  if (text.includes('سن المعاش') || text.includes('سن التقاعد')) scores.pension_age += 8;
+
+  // العثور على الموضوع الأقوى تطابقاً
+  let bestTopic = 'default';
+  let highestScore = 0;
+  for (const [topic, score] of Object.entries(scores)) {
+    if (score > highestScore) {
+      highestScore = score;
+      bestTopic = topic;
+    }
   }
 
-  // 3. فحص سن المعاش وتدرج التقاعد
-  if (lower.includes('سن') || lower.includes('شيخوخة') || lower.includes('60') || lower.includes('65') || lower.includes('2032') || lower.includes('معاش')) {
-    sequence.push({
-      id: 'pension_age_sign',
-      title: 'إشارة: سن التقاعد وتدرج رفع السن حتى 65',
-      signDescription: 'لمس الذقن بالأصابع للدلالة على السن والوقار، ثم رفع اليد تدريجياً للإشارة لرفع سن التقاعد حتى 65 سنة.',
-      handMovement: 'السبابة تلمس الذقن ثم تتحرك اليد في مسار مائل صاعد إشارة لتدرج السنوات حتى عام 2040.',
-      facialExpression: 'ملامح وقار مع حركة رأس مطمئنة.',
-      keyNotice: 'السن الحالي 60 سنة، ويرتفع تدريجياً بدءاً من يوليو 2032 حتى 65 سنة في 2040.',
-      durationSeconds: 5,
-      highlightWords: ['سن 60', 'سن 65', 'تدرج السن', 'يوليو 2032'],
-      visualIcon: '🧓',
-      badgeText: 'سن التقاعد',
-      diagramImage: '/assets/sign_pension_age.jpg',
-      legalArticle: 'المادة 41',
-    });
+  // بناء تسلسل مخصص فقط للموضوع المطلوب دون إقحام مواضيع أخرى
+  switch (bestTopic) {
+    case 'early_retirement':
+      return [
+        {
+          id: 'early_retire_1',
+          title: 'إشارة: المعاش المبكر (إنهاء الخدمة مبكراً)',
+          signDescription: 'وضع اليدين متقاطعتين على الصدر ثم دفعهما للأمام بحركة قطع أفقية تعني التوقف عن العمل قبل السن.',
+          handMovement: 'اليد اليمنى تُشير للزمن (معصم اليد) ثم حركة قطع أفقية بكف اليد اليمنى.',
+          facialExpression: 'ملامح تأكيد وهدوء مع إيماءة الرأس للأسفل.',
+          keyNotice: 'المعاش المبكر: إنهاء الخدمة قبل بلوغ سن الستين القانوني.',
+          durationSeconds: 5,
+          highlightWords: ['معاش مبكر', 'إنهاء خدمة', 'قبل الستين'],
+          visualIcon: '⏳',
+          badgeText: 'المعاش المبكر',
+          diagramImage: '/assets/sign_early_retire.jpg',
+          legalArticle: 'المادة 21 بند 6 من القانون 148',
+        },
+        {
+          id: 'early_retire_2',
+          title: 'إشارة: شرط 25 سنة اشتراك فعلي (300 شهر)',
+          signDescription: 'فتح اليدين لإظهار رقم 25 (أصابع اليدين 10 + 10 + 5) ثم الإشارة لمعصم اليد للدلالة على مدة السنوات.',
+          handMovement: 'إشارة 25 سنة كاملة + فرك الإبهام والسبابة دلالة على استحقاق 50% من أجر التسوية كحد أدنى.',
+          facialExpression: 'تأكيد وحزم على شرط المدة الفعلية بدون شراء مدد.',
+          keyNotice: 'الشرط الحاسم لعام 2025: 25 سنة اشتراك فعلي كاملة بدون انقطاع.',
+          durationSeconds: 5,
+          highlightWords: ['25 سنة', '300 شهر', 'اشتراك فعلي'],
+          visualIcon: '📜',
+          badgeText: 'شرط الـ 25 سنة',
+          diagramImage: '/assets/sign_early_retire.jpg',
+          legalArticle: 'شروط الاستحقاق 2025',
+        },
+      ];
+
+    case 'form_6':
+      return [
+        {
+          id: 'form6_1',
+          title: 'إشارة: استمارة 6 تأمينات (إنهاء الخدمة)',
+          signDescription: 'رسم مستطيل في الهواء بالسبابتين دلالة على الورقة/الاستمارة ثم رفع 6 أصابع (كف كامل + إصبع).',
+          handMovement: 'رسم مستطيل بالسبابتين، ثم إشارة الرقم 6، تليها حركة كف اليد من الصدر للخارج.',
+          facialExpression: 'ملامح جدية وحزم للتأكيد على أهمية النموذج الرسمي.',
+          keyNotice: 'استمارة (6): المستند الرسمي لإثبات نهاية خدمة الموظف أو الاستقالة.',
+          durationSeconds: 5,
+          highlightWords: ['استمارة 6', 'إنهاء الخدمة', 'الاستقالة'],
+          visualIcon: '📄',
+          badgeText: 'استمارة 6',
+          diagramImage: '/assets/sign_form6.jpg',
+          legalArticle: 'قرار 2437 لسنة 2021',
+        },
+        {
+          id: 'form6_2',
+          title: 'إشارة: اعتماد ختم النسر وعدم التوقيع على بياض',
+          signDescription: 'ضرب باطن الكف بقبضة اليد الأخرى كختم النسر مع إشارة الرفض الصارم للتوقيع على بياض.',
+          handMovement: 'حركة الختم المعتمد على راحة اليد ثم إشارة النفي والتنبيه بالسبابة.',
+          facialExpression: 'ملامح تحذير واهتمام بحقوق المؤمن عليه.',
+          keyNotice: 'تحذير تأميني: يجب اعتماد الاستمارة بختم المنشأة والتأمينات وعدم التوقيع على بياض مطلقاً.',
+          durationSeconds: 5,
+          highlightWords: ['ختم النسر', 'اعتماد رسمي', 'حماية قانونية'],
+          visualIcon: '🛡️',
+          badgeText: 'توثيق المستند',
+          diagramImage: '/assets/sign_form6.jpg',
+          legalArticle: 'حماية حقوق العامل',
+        },
+      ];
+
+    case 'marriage_grant':
+      return [
+        {
+          id: 'marriage_1',
+          title: 'إشارة: منحة زواج الابنة أو الأخت',
+          signDescription: 'لمس إصبع البنصر الأيسر بمكان خاتم الزواج (الدبلة)، ثم بسط الكفين لأعلى بابتسامة ومباركة.',
+          handMovement: 'الإبهام والسبابة يلمسان إصبع البنصر باليد الأخرى، ثم رفع الكفين بمباركة وسعادة.',
+          facialExpression: 'ابتسامة واسعة واضحة جداً تدل على التهنئة الصادقة والمباركة.',
+          keyNotice: 'منحة الزواج: حق مالي يمنح لمرة واحدة للابنة أو الأخت المستحقة للمعاش عند عقد قرانها.',
+          durationSeconds: 5,
+          highlightWords: ['منحة زواج', 'عقد قران', 'الابنة المستحقة'],
+          visualIcon: '💍',
+          badgeText: 'منحة الزواج',
+          diagramImage: '/assets/sign_marriage_grant.jpg',
+          legalArticle: 'المادة 105 من القانون 148',
+        },
+        {
+          id: 'marriage_2',
+          title: 'إشارة: قيمة المنحة (معاش 12 شهراً كاملاً)',
+          signDescription: 'رفع أصابع اليدين (10) ثم إصبعين (2) للدلالة على 12 شهراً، تليها حركة سحب المعاش نحو الصدر.',
+          handMovement: 'إشارة رقم 12 بالأصابع ثم حركة قبض الكف دلالة على صرف المبلغ دفعة واحدة.',
+          facialExpression: 'ملامح اطمئنان وفرحة بالاستحقاق المالي.',
+          keyNotice: 'قيمة المنحة تساوي معاش سنة كاملة (12 شهراً) بحد أدنى 500 جنيه، ولا تسقط إلا بعد 5 سنوات.',
+          durationSeconds: 5,
+          highlightWords: ['معاش سنة', '12 شهراً', 'صرف فوري'],
+          visualIcon: '💰',
+          badgeText: 'معاش 12 شهر',
+          diagramImage: '/assets/sign_marriage_grant.jpg',
+          legalArticle: 'اللائحة التنفيذية 2437',
+        },
+      ];
+
+    case 'survivor_pension':
+      return [
+        {
+          id: 'survivor_1',
+          title: 'إشارة: وفاة المؤمن عليه ومعاش الورثة',
+          signDescription: 'خفض اليدين برفق مع إمالة الرأس مواساة، ثم لمس الصدر تعبيراً عن الرحمة والمواساة.',
+          handMovement: 'خفض اليدين للأسفل بخشوع ثم حركة مواساة على الصدر.',
+          facialExpression: 'ملامح مواساة وتعاطف دافئ مع أفراد الأسرة.',
+          keyNotice: 'معاش الوفاة: انتقال الحق المالي للورثة المستحقين (الأرملة، الأبناء، البنات، الوالدين).',
+          durationSeconds: 5,
+          highlightWords: ['وفاة المؤمن عليه', 'حقوق الورثة', 'الأرملة والأبناء'],
+          visualIcon: '🕊️',
+          badgeText: 'معاش الورثة',
+          diagramImage: '/assets/sign_death_survivor.jpg',
+          legalArticle: 'المادة 98 من القانون 148',
+        },
+        {
+          id: 'survivor_2',
+          title: 'إشارة: توزيع الأنصبة وتأمين الأسرة (جدول 7)',
+          signDescription: 'حركة توزيع مروحة بالكفين للإشارة لتوزيع الحصص الشرعية والقانونية على الأسرة.',
+          handMovement: 'تقسيم الهواء بالكف الممدود دلالة على جدول 7 وتوزيع المعاش ومنحة الوفاة (3 شهور).',
+          facialExpression: 'ملامح أمان واطمئنان لحماية حقوق الأسرة.',
+          keyNotice: 'توزيع المعاش يتم بنسب قانونية دقيقة بجدول 7 تكفل الحماية الاجتماعية لكافة المستحقين.',
+          durationSeconds: 5,
+          highlightWords: ['جدول 7', 'توزيع الأنصبة', 'منحة وفاة 3 شهور'],
+          visualIcon: '👨‍👩‍👧‍👦',
+          badgeText: 'توزيع الأنصبة',
+          diagramImage: '/assets/sign_death_survivor.jpg',
+          legalArticle: 'جدول رقم (7) المعتمد',
+        },
+      ];
+
+    case 'insurance_printout':
+    case 'work_injury':
+      return [
+        {
+          id: 'printout_1',
+          title: 'إشارة: استخراج البرنت التأميني المعتمد',
+          signDescription: 'حركة نقر سريعة بالأصابع كالكتابة على الحاسب ثم سحب اليدين رأسياً كإخراج شريط ورقي مطبوع.',
+          handMovement: 'نقر الأصابع (كمبيوتر) ثم سحب اليدين متباعدتين من أعلى لأسفل (طباعة ورقة بيان مدد).',
+          facialExpression: 'تركيز ومتابعة بالعينين لحركة سحب الورقة.',
+          keyNotice: 'البرنت التأميني: بيان معتمد بختم النسر يوضح كامل مدد وسنوات اشتراكك التأمينية.',
+          durationSeconds: 5,
+          highlightWords: ['برنت تأميني', 'بيان مدد', 'مدد الاشتراك'],
+          visualIcon: '🪪',
+          badgeText: 'البرنت التأميني',
+          diagramImage: '/assets/sign_insurance_printout.jpg',
+          legalArticle: 'المادة 7 من اللائحة 2437',
+        },
+        {
+          id: 'printout_2',
+          title: 'إشارة: الرقم التأميني وختم النسر الرسمي',
+          signDescription: 'رسم مستطيل بطاقة الرقم القومي ثم ضرب الكف بقبضة اليد الأخرى كختم النسر الرسمي.',
+          handMovement: 'رسم البطاقة بالسبابتين، ثم دمغ الكف المفتوح بقبضة اليد بقوة.',
+          facialExpression: 'ملامح تأكيد على ضرورة ختم المستند من مكتب التأمينات.',
+          keyNotice: 'يجب أن يكون البرنت التأميني مختوماً بختم النسر ومطابقاً لبطاقة الرقم القومي السارية.',
+          durationSeconds: 5,
+          highlightWords: ['الرقم التأميني', 'ختم النسر', 'بطاقة سارية'],
+          visualIcon: '📁',
+          badgeText: 'توثيق الرقم القومي',
+          diagramImage: '/assets/sign_insurance_printout.jpg',
+          legalArticle: 'إجراءات مكتب التأمينات',
+        },
+      ];
+
+    case 'pension_age':
+    default:
+      return [
+        {
+          id: 'pension_age_1',
+          title: 'إشارة: سن المعاش القانوني (الشيخوخة)',
+          signDescription: 'لمس الذقن بالسبابة للدلالة على السن والوقار ثم قبض الكف نحو الصدر دلالة على استحقاق المعاش.',
+          handMovement: 'السبابة تلمس الذقن بحركة دائرية ثم حركة عد مالي بالأصابع إشارة للمعاش الشهري.',
+          facialExpression: 'ملامح وقار واحترام واطمئنان.',
+          keyNotice: 'سن المعاش: بلوغ السن القانوني يمنح المواطن الحق في المعاش التقاعدي الكامل.',
+          durationSeconds: 5,
+          highlightWords: ['سن المعاش', 'بلوغ السن', 'المعاش الكامل'],
+          visualIcon: '🧓',
+          badgeText: 'سن المعاش',
+          diagramImage: '/assets/sign_pension_age.jpg',
+          legalArticle: 'المادة 21 من القانون 148',
+        },
+        {
+          id: 'pension_age_2',
+          title: 'إشارة: تدرج رفع السن من 60 حتى 65 سنة',
+          signDescription: 'حركة اليد في مسار مائل صاعد تدريجياً للإشارة لرفع سن التقاعد شهراً بعد شهر حتى 65 سنة في 2040.',
+          handMovement: 'كف اليد يرتفع في خطوات تصاعدية متتالية تعبر عن التدرج الزمني بدءاً من عام 2032.',
+          facialExpression: 'ملامح توضيح وشرح هادئ.',
+          keyNotice: 'السن الحالي 60 سنة، ويبدأ الرفع التدريجي ليصل 61 سنة في 2032 حتى يكتمل عند 65 سنة في 2040.',
+          durationSeconds: 5,
+          highlightWords: ['تدرج السن', '65 سنة', '2032 إلى 2040'],
+          visualIcon: '📈',
+          badgeText: 'تدرج سن التقاعد',
+          diagramImage: '/assets/sign_pension_age.jpg',
+          legalArticle: 'المادة 41 من القانون 148',
+        },
+      ];
   }
-
-  // 4. استمارة 6 وإنهاء الخدمة
-  if (lower.includes('استمارة 6') || lower.includes('س6') || lower.includes('استقالة') || lower.includes('إنهاء خدمة') || lower.includes('فصل') || lower.includes('ترك العمل')) {
-    sequence.push({
-      id: 'form6_sign',
-      title: 'إشارة: استمارة (6) تأمينات (إنهاء الخدمة)',
-      signDescription: 'رسم مستطيل في الهواء بالسبابتين، ثم إشارة رقم 6، يعقبها حركة الكف من الداخل للخارج.',
-      handMovement: 'رسم الورقة ثم رفع 6 أصابع ثم حركة دفع الكف للخارج للدلالة على الاستقالة وإنهاء الملف.',
-      facialExpression: 'ملامح جدية وحزم للتأكيد على ضرورة توثيق الاستمارة وعدم التوقيع على بياض.',
-      keyNotice: 'يجب أن تكون معتمدة ومختومة من مكتب التأمينات دون توقيع على بياض.',
-      durationSeconds: 5,
-      highlightWords: ['استمارة 6', 'استقالة', 'ختم النسر', 'إنهاء الخدمة'],
-      visualIcon: '📄',
-      badgeText: 'استمارة 6',
-      diagramImage: '/assets/sign_form6.jpg',
-      legalArticle: 'اللائحة 2437',
-    });
-  }
-
-  // 5. وفاة المؤمن عليه ومعاش الورثة
-  if (lower.includes('وفاة') || lower.includes('ورثة') || lower.includes('أرملة') || lower.includes('مستحق') || lower.includes('أيتام') || lower.includes('والدين')) {
-    sequence.push({
-      id: 'survivor_sign',
-      title: 'إشارة: حقوق الورثة والمستحقين بعد الوفاة',
-      signDescription: 'خفض اليدين برفق مع إمالة الرأس مواساة، ثم فتح الكفين كشجرة أفراد الأسرة المستحقين (جدول 7).',
-      handMovement: 'حركة مواساة على الصدر، ثم تقسيم الهواء بالأيدي للإشارة لتوزيع المعاش على الأرملة والأولاد والوالدين.',
-      facialExpression: 'ملامح مواساة وتعاطف دافئ مع المستحقين.',
-      keyNotice: 'يتم توزيع المعاش على الأرملة والأبناء والوالدين طبقاً للأنصبة القانونية بجدول 7.',
-      durationSeconds: 6,
-      highlightWords: ['أرملة', 'أبناء', 'توزيع الأنصبة', 'جدول 7', 'منحة وفاة'],
-      visualIcon: '🕊️',
-      badgeText: 'معاش الورثة',
-      diagramImage: '/assets/sign_death_survivor.jpg',
-      legalArticle: 'المادة 98 وجدول 7',
-    });
-  }
-
-  // 6. منحة الزواج
-  if (lower.includes('زواج') || lower.includes('منحة زواج') || lower.includes('عقد قران') || lower.includes('عروس') || lower.includes('بنت') || lower.includes('ابنة')) {
-    sequence.push({
-      id: 'marriage_sign',
-      title: 'إشارة: منحة زواج الابنة أو الأخت',
-      signDescription: 'لمس إصبع البنصر مكان خاتم الزواج، ثم فتح الكفين لأعلى بمباركة وسعادة وإشارة معاش 12 شهراً.',
-      handMovement: 'الإبهام والسبابة يلمسان إصبع البنصر باليد الأخرى، ثم حركة بسط الكفين كالمباركة بالفرح.',
-      facialExpression: 'ابتسامة واسعة واضحة جداً تدل على التهنئة الصادقة.',
-      keyNotice: 'منحة الزواج تساوي معاش سنة كاملة (12 شهر) تصرف لمرة واحدة ولا تسقط إلا بعد 5 سنوات.',
-      durationSeconds: 5,
-      highlightWords: ['معاش 12 شهر', 'منحة زواج', 'قسيمة زواج', 'سقوط بالتقادم 5 سنين'],
-      visualIcon: '💍',
-      badgeText: 'منحة الزواج',
-      diagramImage: '/assets/sign_marriage_grant.jpg',
-      legalArticle: 'المادة 105',
-    });
-  }
-
-  // 7. المستندات والبرنت التأميني
-  if (lower.includes('برنت') || lower.includes('رقم تأميني') || lower.includes('أوراق') || lower.includes('مستندات') || lower.includes('بطاقة') || lower.includes('شهادة') || lower.includes('سجل')) {
-    sequence.push({
-      id: 'docs_sign',
-      title: 'إشارة: البرنت التأميني والأوراق الرسمية',
-      signDescription: 'حركة نقر على لوحة المفاتيح ثم سحب شريط ورقي مطبوع والإشارة للرقم القومي وختم النسر.',
-      handMovement: 'رسم مستطيل البطاقة بالسبابة، ثم ضرب الكف المفتوح بقبضة اليد كختم رسمي معتمد.',
-      facialExpression: 'نظرة تأكيد على ضرورة إحضار الأصول والصور والأختام الرسمية.',
-      keyNotice: 'البرنت التأميني مستند معتمد بختم النسر يوضح كامل مدد اشتراكك التأمينية.',
-      durationSeconds: 5,
-      highlightWords: ['برنت تأميني', 'رقم تأميني', 'ختم النسر', 'أصل وصورة'],
-      visualIcon: '📁',
-      badgeText: 'المستندات والبرنت',
-      diagramImage: '/assets/sign_insurance_printout.jpg',
-      legalArticle: 'اللائحة 2437',
-    });
-  }
-
-  // إذا لم يتم تطابق أي موضوع رئيسي، نضيف إشارة سن واستحقاق المعاش كشرح مرئي أساسي
-  if (sequence.length <= 1) {
-    sequence.push({
-      id: 'pension_general_sign',
-      title: 'إشارة: حقوق واشتراكات التأمين الاجتماعي',
-      signDescription: 'لمس الذقن بالسبابة دلالة على الحماية والوقار التأميني، ثم حركة عد مالي للأصابع إشارة لاستحقاق المعاش.',
-      handMovement: 'حركة يد متدرجة لأعلى تعبر عن كفالة الدولة وتأمين المستقبل المالي للمواطن وأسرته.',
-      facialExpression: 'ملامح اطمئنان وثقة.',
-      keyNotice: 'التأمين الاجتماعي يكفل للمواطن معاشاً شهرياً وحماية اجتماعية كاملة وفقاً للقانون 148.',
-      durationSeconds: 5,
-      highlightWords: ['معاش شهري', 'حماية اجتماعية', 'تأمين المستقبل'],
-      visualIcon: '🛡️',
-      badgeText: 'حقوق التأمين',
-      diagramImage: '/assets/sign_pension_age.jpg',
-      legalArticle: 'قانون 148 لسنة 2019',
-    });
-  }
-
-  // 8. الخطوة التنفيذية والمكتب التابع
-  sequence.push({
-    id: 'office_sign',
-    title: 'إشارة: التوجه لمكتب التأمينات التابع أو الاتصال بـ 16217',
-    signDescription: 'الإشارة بالسبابة للأمام دلالة على الذهاب للمكتب، ثم إشارة الهاتف (الإبهام والخنصر) للخط الساخن 16217.',
-    handMovement: 'اليد اليمنى تتجه للأمام كالسير، ثم تشكيل رمز الهاتف على الأذن للاتصال المباشر.',
-    facialExpression: 'ملامح إرشاد وتشجيع مع ابتسامة ودودة.',
-    keyNotice: 'توجه إلى مكتب التأمينات الاجتماعية التابع له محل سكنك أو عملك، أو اتصل بالخط الساخن 16217.',
-    durationSeconds: 5,
-    highlightWords: ['مكتب التأمينات', 'الخط الساخن 16217', 'تحت أمرك'],
-    visualIcon: '🏢',
-    badgeText: 'الخطوة العملية',
-    diagramImage: '/assets/sign_language_interpreter.jpg',
-    legalArticle: 'خدمة المواطنين',
-  });
-
-  return sequence;
 }
